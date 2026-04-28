@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hughes Shuttle — Admin Portal</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8F6F1; color: #1A2340; min-height: 100vh; }
+:root {
+  --navy: #1A2340; --navy-dark: #111827; --navy-mid: #2C3A5C;
+  --gold: #C9A84C; --gold-light: #E8D5A0; --gold-pale: #F5EDD6;
+  --white: #FFFFFF; --offwhite: #F8F6F1; --muted: #6B7280;
+  --border: rgba(201,168,76,0.22); --border-sub: rgba(26,35,64,0.1);
+  --danger: #A32D2D; --danger-bg: #FCEBEB; --danger-border: #F09595;
+  --success: #3B6D11; --success-bg: #EAF3DE; --success-border: #97C459;
+  --warn: #854F0B; --warn-bg: #FAEEDA; --warn-border: #EF9F27;
+}
+
+/* ── Top nav ── */
+.topnav { background: var(--navy); padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: sticky; top: 0; z-index: 100; }
+.nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.nav-logo-icon { width: 30px; height: 30px; border: 1.5px solid var(--gold); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.nav-logo-icon svg { width: 15px; height: 15px; fill: var(--gold); }
+.nav-logo-text { font-size: 15px; font-weight: 600; color: var(--white); letter-spacing: 0.03em; }
+.nav-logo-badge { font-size: 10px; background: var(--gold); color: var(--navy-dark); border-radius: 4px; padding: 2px 7px; font-weight: 700; letter-spacing: 0.05em; margin-left: 4px; }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-admin-name { font-size: 13px; color: rgba(255,255,255,0.6); }
+.nav-signout { font-size: 12px; color: var(--gold); cursor: pointer; font-weight: 600; background: none; border: none; font-family: inherit; }
+.nav-signout:hover { text-decoration: underline; }
+
+/* ── Layout ── */
+.layout { display: flex; min-height: calc(100vh - 56px); }
+
+/* ── Sidebar ── */
+.sidebar { width: 220px; background: var(--white); border-right: 0.5px solid var(--border-sub); flex-shrink: 0; padding: 1.25rem 0; }
+.sidebar-section { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; padding: 0 1.25rem; margin: 1rem 0 0.4rem; }
+.sidebar-section:first-child { margin-top: 0; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 1.25rem; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; user-select: none; }
+.nav-item:hover { background: var(--offwhite); color: var(--navy); }
+.nav-item.active { background: var(--gold-pale); color: var(--navy); border-left-color: var(--gold); font-weight: 600; }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--navy); color: var(--gold); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+
+/* ── Main content ── */
+.main { flex: 1; padding: 1.75rem 2rem; overflow-x: hidden; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Page header ── */
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+.page-title { font-size: 22px; font-weight: 700; color: var(--navy); }
+.page-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ── Stat cards ── */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+.stat-card { background: var(--white); border: 0.5px solid var(--border-sub); border-radius: 10px; padding: 1rem; }
+.stat-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--navy); }
+.stat-value.gold { color: var(--gold); }
+.stat-value.green { color: var(--success); }
+.stat-value.red { color: var(--danger); }
+
+/* ── Toolbar ── */
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+.search-box { flex: 1; min-width: 180px; max-width: 320px; position: relative; }
+.search-box input { width: 100%; padding: 8px 12px 8px 34px; border: 0.5px solid var(--border-sub); border-radius: 7px; font-size: 13px; color: var(--navy); background: var(--white); outline: none; font-family: inherit; }
+.search-box input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-pale); }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; fill: var(--muted); }
+.filter-select { padding: 8px 10px; border: 0.5px solid var(--border-sub); border-radius: 7px; font-size: 13px; color: var(--navy); background: var(--white); outline: none; font-family: inherit; cursor: pointer; }
+.filter-select:focus { border-color: var(--gold); }
+.record-count { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+
+/* ── Buttons ── */
+.btn { padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; transition: background 0.15s; white-space: nowrap; }
+.btn-gold { background: var(--gold); color: var(--navy-dark); }
+.btn-gold:hover { background: var(--gold-light); }
+.btn-navy { background: var(--navy); color: var(--gold); }
+.btn-navy:hover { background: var(--navy-mid); }
+.btn-outline { background: transparent; color: var(--navy); border: 0.5px solid var(--border-sub); }
+.btn-outline:hover { background: var(--offwhite); }
+.btn-danger { background: var(--danger-bg); color: var(--danger); border: 0.5px solid var(--danger-border); }
+.btn-danger:hover { background: #f7c1c1; }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
+
+/* ── Table ── */
+.table-wrap { background: var(--white); border: 0.5px solid var(--border-sub); border-radius: 10px; overflow: hidden; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th { background: var(--navy); color: var(--gold); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 14px; text-align: left; white-space: nowrap; cursor: pointer; user-select: none; }
+.data-table th:hover { background: var(--navy-mid); }
+.data-table td { padding: 11px 14px; border-bottom: 0.5px solid var(--border-sub); color: var(--navy); vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--offwhite); }
+.data-table td.muted { color: var(--muted); font-size: 12px; }
+.sort-arrow { display: inline-block; margin-left: 4px; opacity: 0.5; font-size: 10px; }
+.sort-arrow.active { opacity: 1; }
+
+/* ── Badges / pills ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+.badge-active   { background: var(--success-bg); color: var(--success); }
+.badge-suspended{ background: var(--warn-bg); color: var(--warn); }
+.badge-new      { background: #E6F1FB; color: #185FA5; }
+.badge-inactive { background: #F1EFE8; color: #5F5E5A; }
+.badge-admin    { background: var(--gold-pale); color: var(--navy); border: 0.5px solid var(--gold); }
+.badge-confirmed{ background: var(--success-bg); color: var(--success); }
+.badge-cancelled{ background: var(--danger-bg); color: var(--danger); }
+.badge-pending  { background: var(--warn-bg); color: var(--warn); }
+
+/* ── Toggle switch ── */
+.toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border-sub); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+.toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+.toggle input:checked + .toggle-slider { background: var(--gold); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display: none; align-items: center; justify-content: center; z-index: 500; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--white); border-radius: 12px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; padding: 1.75rem; position: relative; }
+.modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--muted); line-height: 1; }
+.modal-close:hover { color: var(--navy); }
+.modal-title { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; }
+.modal-divider { border: none; border-top: 0.5px solid var(--border-sub); margin: 1.25rem 0; }
+.modal-section { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 0.75rem; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-grid.single { grid-template-columns: 1fr; }
+.modal-field { display: flex; flex-direction: column; gap: 5px; }
+.modal-field.full { grid-column: 1 / -1; }
+.modal-label { font-size: 11px; font-weight: 700; color: var(--navy); letter-spacing: 0.04em; text-transform: uppercase; }
+.modal-input, .modal-select { width: 100%; padding: 9px 12px; border: 0.5px solid var(--border-sub); border-radius: 7px; font-size: 13px; color: var(--navy); background: var(--offwhite); outline: none; font-family: inherit; }
+.modal-input:focus, .modal-select:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-pale); background: var(--white); }
+.modal-check-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--offwhite); border: 0.5px solid var(--border-sub); border-radius: 7px; cursor: pointer; }
+.modal-check-row input { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
+.modal-check-label { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.modal-check-label strong { color: var(--navy); font-weight: 600; display: block; }
+.modal-status { font-size: 13px; padding: 9px 12px; border-radius: 7px; margin-bottom: 1rem; display: none; }
+.modal-status.show { display: block; }
+.modal-status.success { background: var(--success-bg); color: var(--success); border: 0.5px solid var(--success-border); }
+.modal-status.error   { background: var(--danger-bg); color: var(--danger); border: 0.5px solid var(--danger-border); }
+
+/* ── Bookings table extras ── */
+.booking-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ref-code { font-family: monospace; font-size: 12px; font-weight: 600; color: var(--navy); letter-spacing: 0.05em; }
+
+/* ── Empty state ── */
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+.empty-state svg { width: 40px; height: 40px; fill: var(--border-sub); margin-bottom: 1rem; }
+.empty-state p { font-size: 14px; }
+
+/* ── Proto banner ── */
+.proto-banner { background: var(--gold-pale); border-bottom: 0.5px solid var(--gold); padding: 5px 1rem; font-size: 12px; color: var(--warn); text-align: center; font-weight: 500; }
+
+/* ── Schedule editor ── */
+.sched-stop-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border-sub); }
+.sched-stop-row:last-child { border-bottom: none; }
+.sched-stop-num { width: 28px; height: 28px; border-radius: 50%; background: var(--gold-pale); border: 1px solid var(--gold); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--navy); flex-shrink: 0; }
+.sched-stop-info { flex: 1; min-width: 0; }
+.sched-stop-name { font-size: 13px; font-weight: 600; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched-stop-addr { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.sched-time-input { width: 110px; padding: 8px 10px; border: 0.5px solid var(--border-sub); border-radius: 7px; font-size: 14px; font-weight: 600; color: var(--navy); background: var(--white); outline: none; font-family: inherit; flex-shrink: 0; }
+.sched-time-input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-pale); }
+.sched-time-input:disabled { background: var(--offwhite); color: var(--muted); border-color: var(--border-sub); font-weight: 400; }
+.sched-ns-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.sched-ns-label input { accent-color: var(--navy); cursor: pointer; width: 14px; height: 14px; }
+
+@media (max-width: 700px) {
+  .sidebar { display: none; }
+  .main { padding: 1rem; }
+  .modal-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .sched-stop-row { flex-wrap: wrap; }
+}
+
+  .hdr-divider { width: 1px; height: 28px; background: rgba(201,168,76,0.35); margin: 0 4px; flex-shrink: 0; }
+  .hdr-logo-partner { display: flex; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">Prototype — Hughes Shuttle admin portal (UI demo only — no live data)</div>
+
+<!-- ── Top nav ── -->
+<nav class="topnav">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M17 11H7V7a5 5 0 0110 0v4zm-5 9a3 3 0 01-3-3h6a3 3 0 01-3 3zm9-9h-1V7A8 8 0 006 7v4H5a2 2 0 00-2 2v6a2 2 0 002 2h14a2 2 0 002-2v-6a2 2 0 00-2-2z"/></svg>
+    </div>
+    <span class="nav-logo-text">Hughes Shuttle</span>
+    <span class="nav-logo-badge">ADMIN</span>
+    <div class="hdr-divider" style="margin:0 10px;height:24px;"></div>
+    <img src="data:image/png;base64,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" alt="Adelaide University Village" style="height:24px;object-fit:contain;">
+  </div>
+  <div class="nav-right">
+    <span class="nav-admin-name">Signed in as <strong style="color:var(--gold);">Admin User</strong></span>
+    <button class="nav-signout" onclick="alert('Sign out')">Sign out</button>
+  </div>
+</nav>
+
+<!-- ── Layout ── -->
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <div class="nav-item active" onclick="switchPanel('dashboard')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Dashboard
+    </div>
+
+    <div class="sidebar-section">Users</div>
+    <div class="nav-item" onclick="switchPanel('users')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      User management
+      <span class="nav-badge" id="badge-users">0</span>
+    </div>
+    <div class="nav-item" onclick="switchPanel('adduser')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      Add new user
+    </div>
+
+    <div class="sidebar-section">Bookings</div>
+    <div class="nav-item" onclick="switchPanel('bookings')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+      All bookings
+      <span class="nav-badge" id="badge-bookings">0</span>
+    </div>
+    <div class="nav-item" onclick="switchPanel('history')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+      Booking history
+    </div>
+
+    <div class="sidebar-section">Services</div>
+    <div class="nav-item" onclick="switchPanel('services')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+      Manage services
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- ════ DASHBOARD ════ -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">Hughes Shuttle — overview</div>
+        </div>
+        <div class="header-actions">
+          <span style="font-size:12px;color:var(--muted);" id="dash-date"></span>
+        </div>
+      </div>
+      <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+        <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value" id="ds-total">6</div></div>
+        <div class="stat-card"><div class="stat-label">Active users</div><div class="stat-value green" id="ds-active">5</div></div>
+        <div class="stat-card"><div class="stat-label">Today's bookings</div><div class="stat-value gold" id="ds-today">11</div></div>
+        <div class="stat-card"><div class="stat-label">Seats filled today</div><div class="stat-value" id="ds-seats">11 / 198</div></div>
+        <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value red" id="ds-cancelled">2</div></div>
+      </div>
+
+      <!-- Today's service snapshot -->
+      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Today's services</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Service</th><th>First departure</th><th>Booked</th><th>Available</th><th>Status</th>
+          </tr></thead>
+          <tbody id="dash-services-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ USER MANAGEMENT ════ -->
+    <div class="panel" id="panel-users">
+      <div class="page-header">
+        <div><div class="page-title">User management</div><div class="page-sub">View, edit and control student access</div></div>
+        <div class="header-actions">
+          <button class="btn btn-gold" onclick="switchPanel('adduser')">+ Add new user</button>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value" id="u-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value green" id="u-active">0</div></div>
+        <div class="stat-card"><div class="stat-label">Suspended</div><div class="stat-value red" id="u-suspended">0</div></div>
+        <div class="stat-card"><div class="stat-label">Admins</div><div class="stat-value gold" id="u-admins">0</div></div>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          <input type="text" id="user-search" placeholder="Search name, email or student ID…" oninput="renderUsers()">
+        </div>
+        <select class="filter-select" id="user-status-filter" onchange="renderUsers()">
+          <option value="all">All statuses</option>
+          <option value="Active">Active</option>
+          <option value="Suspended">Suspended</option>
+          <option value="New">New</option>
+        </select>
+        <span class="record-count" id="user-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="user-table">
+          <thead><tr>
+            <th onclick="sortUsers('name')">Name <span class="sort-arrow">↕</span></th>
+            <th onclick="sortUsers('email')">Email <span class="sort-arrow">↕</span></th>
+            <th>Student ID</th>
+            <th onclick="sortUsers('status')">Status <span class="sort-arrow">↕</span></th>
+            <th>Admin</th>
+            <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
+            <th>Access</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ ADD USER ════ -->
+    <div class="panel" id="panel-adduser">
+      <div class="page-header">
+        <div><div class="page-title">Add new user</div><div class="page-sub">Create a student account and send a welcome email</div></div>
+      </div>
+      <div style="max-width:520px;background:var(--white);border:0.5px solid var(--border-sub);border-radius:12px;padding:1.75rem;">
+        <div class="modal-status" id="add-status"></div>
+        <div class="modal-grid">
+          <div class="modal-field full">
+            <label class="modal-label">Full name *</label>
+            <input class="modal-input" id="add-name" type="text" placeholder="Jane Doe">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Email address *</label>
+            <input class="modal-input" id="add-email" type="email" placeholder="jane@example.com">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Student ID *</label>
+            <input class="modal-input" id="add-sid" type="text" placeholder="S12345678">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Temporary password *</label>
+            <input class="modal-input" id="add-pw" type="password" placeholder="Min. 8 characters">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Mobile (optional)</label>
+            <input class="modal-input" id="add-mobile" type="tel" placeholder="04XX XXX XXX">
+          </div>
+        </div>
+        <div class="modal-check-row" style="margin-top:1rem;">
+          <input type="checkbox" id="add-is-admin">
+          <label class="modal-check-label" for="add-is-admin">
+            <strong>Grant admin access</strong>
+            This user will be able to access the admin portal
+          </label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:1.25rem;">
+          <button class="btn btn-gold" id="btn-submit-add" onclick="submitAddUser()">Create account &amp; send email</button>
+          <button class="btn btn-outline" onclick="switchPanel('users')">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ BOOKINGS ════ -->
+    <div class="panel" id="panel-bookings">
+      <div class="page-header">
+        <div><div class="page-title">All bookings</div><div class="page-sub">Current and upcoming shuttle bookings</div></div>
+        <div class="header-actions">
+          <input type="date" class="filter-select" id="booking-date-filter" onchange="renderBookings()">
+          <select class="filter-select" id="booking-svc-filter" onchange="renderBookings()">
+            <option value="all">All services</option>
+            <option value="1">Service 1</option><option value="2">Service 2</option>
+            <option value="3">Service 3</option><option value="4">Service 4</option>
+            <option value="5">Service 5</option><option value="6">Service 6</option>
+            <option value="7">Service 7</option><option value="8">Service 8</option>
+            <option value="9">Service 9</option>
+          </select>
+          <select class="filter-select" id="booking-status-filter" onchange="renderBookings()">
+            <option value="all">All statuses</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Pending">Pending</option>
+          </select>
+          <span class="record-count" id="booking-count"></span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
+          </tr></thead>
+          <tbody id="booking-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ BOOKING HISTORY ════ -->
+    <div class="panel" id="panel-history">
+      <div class="page-header">
+        <div><div class="page-title">Booking history</div><div class="page-sub">Historical record of all shuttle bookings</div></div>
+        <div class="header-actions">
+          <select class="filter-select" id="hist-filter" onchange="renderHistory()">
+            <option value="all">All bookings</option>
+            <option value="Confirmed">Confirmed only</option>
+            <option value="Cancelled">Cancelled only</option>
+          </select>
+          <span class="record-count" id="hist-count"></span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Ref</th><th>Student</th><th>Service</th><th>Date</th><th>Stop</th><th>Seats</th><th>Status</th><th>Booked at</th>
+          </tr></thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ SERVICES ════ -->
+    <div class="panel" id="panel-services">
+      <div class="page-header">
+        <div><div class="page-title">Manage services</div><div class="page-sub">View availability and edit stop times for each service</div></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total services</div><div class="stat-value">9</div></div>
+        <div class="stat-card"><div class="stat-label">Total capacity</div><div class="stat-value">198</div></div>
+        <div class="stat-card"><div class="stat-label">Seats booked</div><div class="stat-value gold" id="svc-booked-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">Seats available</div><div class="stat-value green" id="svc-avail-total">0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Service</th><th>First departure</th><th>Stops served</th><th>Capacity</th><th>Booked</th><th>Available</th><th>Fill %</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="svc-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ════ EDIT USER MODAL ════ -->
+<div class="modal-overlay" id="modal-edit-user">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit-user')">&#10005;</button>
+    <div class="modal-title">Edit user</div>
+    <div class="modal-sub" id="edit-user-email" style="color:var(--gold);font-weight:600;"></div>
+    <div class="modal-status" id="edit-user-status"></div>
+    <input type="hidden" id="edit-user-id">
+    <div class="modal-grid">
+      <div class="modal-field full">
+        <label class="modal-label">Full name</label>
+        <input class="modal-input" id="edit-user-name" type="text">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Student ID</label>
+        <input class="modal-input" id="edit-user-sid" type="text">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Mobile</label>
+        <input class="modal-input" id="edit-user-mobile" type="tel">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Account status</label>
+        <select class="modal-select" id="edit-user-accstatus">
+          <option value="Active">Active</option>
+          <option value="Suspended">Suspended</option>
+          <option value="New">New</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">New password</label>
+        <input class="modal-input" id="edit-user-pw" type="password" placeholder="Leave blank to keep current">
+      </div>
+    </div>
+    <div class="modal-check-row" style="margin-top:1rem;">
+      <input type="checkbox" id="edit-user-admin">
+      <label class="modal-check-label" for="edit-user-admin">
+        <strong>Admin access</strong>
+        Allow this user to access the admin portal
+      </label>
+    </div>
+    <hr class="modal-divider">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-gold" id="btn-save-user" onclick="saveUser()">Save changes</button>
+      <button class="btn btn-danger" id="btn-suspend-user" onclick="toggleSuspend()">Suspend account</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-user')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ BOOKING DETAIL MODAL ════ -->
+<div class="modal-overlay" id="modal-booking">
+  <div class="modal" style="max-width:440px;">
+    <button class="modal-close" onclick="closeModal('modal-booking')">&#10005;</button>
+    <div class="modal-title">Booking detail</div>
+    <div class="modal-status" id="bk-modal-status"></div>
+    <div id="bk-modal-body" style="font-size:13px;line-height:2;color:var(--navy);"></div>
+    <hr class="modal-divider">
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-danger btn-sm" id="btn-cancel-booking" onclick="cancelBooking()">Cancel booking</button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('modal-booking')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EDIT SCHEDULE MODAL ════ -->
+<div class="modal-overlay" id="modal-schedule">
+  <div class="modal" style="max-width:580px;">
+    <button class="modal-close" onclick="closeModal('modal-schedule')">&#10005;</button>
+    <div class="modal-title" id="sched-modal-title">Edit schedule</div>
+    <div class="modal-sub">Set the departure time for each stop, or toggle a stop off to mark it as not serviced.</div>
+    <div class="modal-status" id="sched-status"></div>
+    <div id="sched-stops-grid"></div>
+    <hr class="modal-divider">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-gold" onclick="saveSchedule()">Save schedule</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-schedule')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CAP = 22;
+const STOPS = [
+  { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
+  { num:2, name:'City Campus West',            addr:'Medical School' },
+  { num:3, name:'Bus Interchange Centre',       addr:'Stop W2 King William St - West side' },
+  { num:4, name:'Bus Interchange Centre',       addr:'Stop C3 King William St - East side' },
+  { num:5, name:'City Campus East',             addr:'Business School' },
+  { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
+];
+const SERVICES = [
+  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:8  },
+  { id:2, times:['7:05', '7:15','*N/S','7:20', '7:25','*N/S'], booked:17 },
+  { id:3, times:['7:40', '7:50','*N/S','7:55', '8:05','*N/S'], booked:9  },
+  { id:4, times:['8:20', '8:30','*N/S','8:40', '8:50','*N/S'], booked:19 },
+  { id:5, times:['9:10','*N/S', '9:20','*N/S','*N/S','*N/S'], booked:22 },
+  { id:6, times:['9:30', '9:40','*N/S','9:50','10:00','*N/S'], booked:4  },
+  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'], booked:11 },
+  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'], booked:15 },
+  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'], booked:2  },
+];
+
+// ── Sample data ──
+let _users = [
+  { id:'u1', name:'Jane Doe',      email:'jane.doe@uni.edu.au',     sid:'S10012345', mobile:'0411 111 111', status:'Active',    isAdmin:false, bookings:7  },
+  { id:'u2', name:'Tom Nguyen',    email:'t.nguyen@uni.edu.au',     sid:'S10023456', mobile:'0422 222 222', status:'Active',    isAdmin:false, bookings:12 },
+  { id:'u3', name:'Sarah Blake',   email:'s.blake@uni.edu.au',      sid:'S10034567', mobile:'0433 333 333', status:'Suspended', isAdmin:false, bookings:3  },
+  { id:'u4', name:'Marcus Lee',    email:'m.lee@uni.edu.au',        sid:'S10045678', mobile:'0444 444 444', status:'Active',    isAdmin:false, bookings:20 },
+  { id:'u5', name:'Priya Sharma',  email:'p.sharma@uni.edu.au',     sid:'S10056789', mobile:'0455 555 555', status:'Active',    isAdmin:true,  bookings:9  },
+  { id:'u6', name:'Alex Thornton', email:'a.thornton@uni.edu.au',   sid:'S10067890', mobile:'0466 666 666', status:'New',       isAdmin:false, bookings:0  },
+];
+
+let _bookings = [
+  { ref:'SHT-4821', userId:'u1', name:'Jane Doe',      svc:2, stopNum:1, time:'7:05',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 08:14' },
+  { ref:'SHT-4822', userId:'u2', name:'Tom Nguyen',    svc:3, stopNum:4, time:'7:55',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 08:22' },
+  { ref:'SHT-4823', userId:'u4', name:'Marcus Lee',    svc:1, stopNum:1, time:'06:45', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 09:01' },
+  { ref:'SHT-4824', userId:'u5', name:'Priya Sharma',  svc:4, stopNum:2, time:'8:30',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 09:45' },
+  { ref:'SHT-4825', userId:'u2', name:'Tom Nguyen',    svc:7, stopNum:4, time:'10:35', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 10:00' },
+  { ref:'SHT-4826', userId:'u1', name:'Jane Doe',      svc:6, stopNum:1, time:'9:30',  seats:1, status:'Cancelled', date:'2026-04-18', bookedAt:'2026-04-17 10:15' },
+  { ref:'SHT-4827', userId:'u4', name:'Marcus Lee',    svc:9, stopNum:2, time:'11:55', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 10:30' },
+  { ref:'SHT-4828', userId:'u6', name:'Alex Thornton', svc:8, stopNum:6, time:'11:40', seats:1, status:'Pending',   date:'2026-04-18', bookedAt:'2026-04-17 11:00' },
+  { ref:'SHT-4800', userId:'u3', name:'Sarah Blake',   svc:2, stopNum:1, time:'7:05',  seats:1, status:'Confirmed', date:'2026-04-16', bookedAt:'2026-04-15 09:10' },
+  { ref:'SHT-4801', userId:'u2', name:'Tom Nguyen',    svc:5, stopNum:3, time:'9:20',  seats:1, status:'Cancelled', date:'2026-04-16', bookedAt:'2026-04-15 10:05' },
+  { ref:'SHT-4780', userId:'u4', name:'Marcus Lee',    svc:3, stopNum:4, time:'7:55',  seats:1, status:'Confirmed', date:'2026-04-15', bookedAt:'2026-04-14 08:00' },
+  { ref:'SHT-4781', userId:'u1', name:'Jane Doe',      svc:6, stopNum:1, time:'9:30',  seats:1, status:'Confirmed', date:'2026-04-15', bookedAt:'2026-04-14 08:45' },
+];
+
+let _userSort = { col:'name', dir:'asc' };
+let _editUserId = null;
+let _editBookingRef = null;
+
+// ── Init ──
+function init() {
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('booking-date-filter').value = '2026-04-18';
+  updateBadges();
+  renderDashServices();
+  renderServices();
+}
+
+function updateBadges() {
+  document.getElementById('badge-users').textContent = _users.length;
+  document.getElementById('badge-bookings').textContent = _bookings.filter(b => b.date === '2026-04-18' && b.status !== 'Cancelled').length;
+  const stats = computeUserStats();
+  document.getElementById('u-total').textContent = stats.total;
+  document.getElementById('u-active').textContent = stats.active;
+  document.getElementById('u-suspended').textContent = stats.suspended;
+  document.getElementById('u-admins').textContent = stats.admins;
+}
+
+function computeUserStats() {
+  return {
+    total: _users.length,
+    active: _users.filter(u => u.status === 'Active').length,
+    suspended: _users.filter(u => u.status === 'Suspended').length,
+    admins: _users.filter(u => u.isAdmin).length,
+  };
+}
+
+// ── Panel switching ──
+function switchPanel(key) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + key).classList.add('active');
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  if (key === 'users')    renderUsers();
+  if (key === 'bookings') renderBookings();
+  if (key === 'history')  renderHistory();
+  if (key === 'services') renderServicesPanel();
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function badgeCls(st) { return st === 'Active' ? 'badge-active' : st === 'Suspended' ? 'badge-suspended' : st === 'New' ? 'badge-new' : 'badge-inactive'; }
+function bkBadge(st) { return st === 'Confirmed' ? 'badge-confirmed' : st === 'Cancelled' ? 'badge-cancelled' : 'badge-pending'; }
+
+// ── Dashboard services ──
+function renderDashServices() {
+  const tbody = document.getElementById('dash-services-body');
+  tbody.innerHTML = SERVICES.map(s => {
+    const left = CAP - s.booked;
+    const full = left === 0;
+    const low  = left <= 3 && !full;
+    const stops = STOPS.filter((_, i) => s.times[i] !== '*N/S').length;
+    return `<tr>
+      <td><strong>Service No.${s.id}</strong></td>
+      <td>${s.times.find(t => t !== '*N/S')}</td>
+      <td>${s.booked} / ${CAP}</td>
+      <td>${left}</td>
+      <td><span class="badge ${full ? 'badge-cancelled' : low ? 'badge-pending' : 'badge-confirmed'}">${full ? 'Full' : low ? 'Low' : 'Available'}</span></td>
+    </tr>`;
+  }).join('');
+  const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
+  document.getElementById('ds-seats').textContent = totalBooked + ' / ' + (CAP * 9);
+}
+
+// ── Users ──
+function sortUsers(col) {
+  if (_userSort.col === col) _userSort.dir = _userSort.dir === 'asc' ? 'desc' : 'asc';
+  else { _userSort.col = col; _userSort.dir = 'asc'; }
+  renderUsers();
+}
+
+function renderUsers() {
+  const q      = (document.getElementById('user-search').value || '').toLowerCase();
+  const fStat  = document.getElementById('user-status-filter').value;
+  let users    = _users.filter(u => {
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.sid.toLowerCase().includes(q);
+    const matchS = fStat === 'all' || u.status === fStat;
+    return matchQ && matchS;
+  });
+  users.sort((a, b) => {
+    let va = a[_userSort.col], vb = b[_userSort.col];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return _userSort.dir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+  document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
+  const tbody = document.getElementById('user-tbody');
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  tbody.innerHTML = users.map(u => `<tr>
+    <td><strong>${esc(u.name)}</strong></td>
+    <td class="muted">${esc(u.email)}</td>
+    <td class="muted">${esc(u.sid)}</td>
+    <td><span class="badge ${badgeCls(u.status)}">${u.status}</span></td>
+    <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
+    <td>${u.bookings}</td>
+    <td>
+      <label class="toggle" title="${u.status === 'Active' ? 'Active' : 'Suspended'}">
+        <input type="checkbox" ${u.status === 'Active' ? 'checked' : ''} onchange="quickToggleAccess('${u.id}', this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </td>
+    <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${u.id}')">Edit</button></td>
+  </tr>`).join('');
+}
+
+function quickToggleAccess(uid, active) {
+  const u = _users.find(u => u.id === uid);
+  if (!u) return;
+  u.status = active ? 'Active' : 'Suspended';
+  updateBadges();
+  renderUsers();
+}
+
+function openEditUser(uid) {
+  const u = _users.find(u => u.id === uid);
+  if (!u) return;
+  _editUserId = uid;
+  document.getElementById('edit-user-id').value      = uid;
+  document.getElementById('edit-user-email').textContent = u.email;
+  document.getElementById('edit-user-name').value    = u.name;
+  document.getElementById('edit-user-sid').value     = u.sid;
+  document.getElementById('edit-user-mobile').value  = u.mobile;
+  document.getElementById('edit-user-accstatus').value = u.status;
+  document.getElementById('edit-user-pw').value      = '';
+  document.getElementById('edit-user-admin').checked = u.isAdmin;
+  document.getElementById('btn-suspend-user').textContent = u.status === 'Suspended' ? 'Reinstate account' : 'Suspend account';
+  const s = document.getElementById('edit-user-status');
+  s.className = 'modal-status'; s.textContent = '';
+  openModal('modal-edit-user');
+}
+
+function saveUser() {
+  const u = _users.find(u => u.id === _editUserId);
+  if (!u) return;
+  u.name    = document.getElementById('edit-user-name').value.trim() || u.name;
+  u.sid     = document.getElementById('edit-user-sid').value.trim() || u.sid;
+  u.mobile  = document.getElementById('edit-user-mobile').value.trim();
+  u.status  = document.getElementById('edit-user-accstatus').value;
+  u.isAdmin = document.getElementById('edit-user-admin').checked;
+  const s = document.getElementById('edit-user-status');
+  s.textContent = 'Changes saved.'; s.className = 'modal-status show success';
+  updateBadges();
+  renderUsers();
+  setTimeout(() => closeModal('modal-edit-user'), 1200);
+}
+
+function toggleSuspend() {
+  const u = _users.find(u => u.id === _editUserId);
+  if (!u) return;
+  u.status = u.status === 'Suspended' ? 'Active' : 'Suspended';
+  document.getElementById('edit-user-accstatus').value = u.status;
+  document.getElementById('btn-suspend-user').textContent = u.status === 'Suspended' ? 'Reinstate account' : 'Suspend account';
+  const s = document.getElementById('edit-user-status');
+  s.textContent = 'Account ' + (u.status === 'Suspended' ? 'suspended.' : 'reinstated.'); s.className = 'modal-status show ' + (u.status === 'Suspended' ? 'error' : 'success');
+  updateBadges(); renderUsers();
+}
+
+function submitAddUser() {
+  const name  = document.getElementById('add-name').value.trim();
+  const email = document.getElementById('add-email').value.trim();
+  const sid   = document.getElementById('add-sid').value.trim();
+  const pw    = document.getElementById('add-pw').value;
+  const s     = document.getElementById('add-status');
+  if (!name || !email || !sid || pw.length < 8) {
+    s.textContent = 'Please fill in all required fields. Password must be at least 8 characters.';
+    s.className = 'modal-status show error'; return;
+  }
+  const newUser = {
+    id: 'u' + Date.now(), name, email, sid,
+    mobile: document.getElementById('add-mobile').value.trim(),
+    status: 'New', isAdmin: document.getElementById('add-is-admin').checked, bookings: 0
+  };
+  _users.unshift(newUser);
+  updateBadges();
+  s.textContent = 'Account created and welcome email sent to ' + email + '.';
+  s.className = 'modal-status show success';
+  document.getElementById('add-name').value = document.getElementById('add-email').value = document.getElementById('add-sid').value = document.getElementById('add-pw').value = document.getElementById('add-mobile').value = '';
+  document.getElementById('add-is-admin').checked = false;
+  setTimeout(() => switchPanel('users'), 1500);
+}
+
+// ── Bookings ──
+function renderBookings() {
+  const dateF = document.getElementById('booking-date-filter').value;
+  const svcF  = document.getElementById('booking-svc-filter').value;
+  const stF   = document.getElementById('booking-status-filter').value;
+  let bks = _bookings.filter(b => {
+    return (!dateF || b.date === dateF) &&
+           (svcF === 'all' || String(b.svc) === svcF) &&
+           (stF === 'all' || b.status === stF);
+  });
+  document.getElementById('booking-count').textContent = bks.length + ' booking' + (bks.length !== 1 ? 's' : '');
+  const tbody = document.getElementById('booking-tbody');
+  if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found for selected filters.</td></tr>'; return; }
+  tbody.innerHTML = bks.map(b => `<tr>
+    <td><span class="ref-code">${b.ref}</span></td>
+    <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(_users.find(u=>u.id===b.userId)?.sid||'')}</div></td>
+    <td>Service No.${b.svc}</td>
+    <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name}</td>
+    <td>${b.time}</td>
+    <td>1</td>
+    <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
+    <td class="muted">${b.bookedAt}</td>
+    <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
+  </tr>`).join('');
+}
+
+function renderHistory() {
+  const filt = document.getElementById('hist-filter').value;
+  const bks  = _bookings.filter(b => filt === 'all' || b.status === filt).sort((a,b) => b.date.localeCompare(a.date));
+  document.getElementById('hist-count').textContent = bks.length + ' record' + (bks.length !== 1 ? 's' : '');
+  const tbody = document.getElementById('hist-tbody');
+  tbody.innerHTML = bks.map(b => `<tr>
+    <td><span class="ref-code">${b.ref}</span></td>
+    <td>${esc(b.name)}</td>
+    <td>Service No.${b.svc}</td>
+    <td>${b.date}</td>
+    <td>Stop ${b.stopNum}</td>
+    <td>1</td>
+    <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
+    <td class="muted">${b.bookedAt}</td>
+  </tr>`).join('');
+}
+
+function openBookingDetail(ref) {
+  const b = _bookings.find(b => b.ref === ref);
+  if (!b) return;
+  _editBookingRef = ref;
+  const s = document.getElementById('bk-modal-status');
+  s.className = 'modal-status'; s.textContent = '';
+  document.getElementById('btn-cancel-booking').style.display = b.status === 'Confirmed' ? 'inline-block' : 'none';
+  document.getElementById('bk-modal-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">
+      <div><span style="color:var(--muted);">Ref</span></div><div><strong>${b.ref}</strong></div>
+      <div><span style="color:var(--muted);">Student</span></div><div>${esc(b.name)}</div>
+      <div><span style="color:var(--muted);">Student ID</span></div><div>${esc(_users.find(u=>u.id===b.userId)?.sid||'—')}</div>
+      <div><span style="color:var(--muted);">Service</span></div><div>Service No.${b.svc}</div>
+      <div><span style="color:var(--muted);">Stop</span></div><div>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name}</div>
+      <div><span style="color:var(--muted);">Departure</span></div><div>${b.time}</div>
+      <div><span style="color:var(--muted);">Date</span></div><div>${b.date}</div>
+      <div><span style="color:var(--muted);">Seats</span></div><div>1</div>
+      <div><span style="color:var(--muted);">Status</span></div><div><span class="badge ${bkBadge(b.status)}">${b.status}</span></div>
+      <div><span style="color:var(--muted);">Booked at</span></div><div>${b.bookedAt}</div>
+    </div>`;
+  openModal('modal-booking');
+}
+
+function cancelBooking() {
+  const b = _bookings.find(b => b.ref === _editBookingRef);
+  if (!b) return;
+  b.status = 'Cancelled';
+  const svc = SERVICES.find(s => s.id === b.svc);
+  if (svc) svc.booked = Math.max(0, svc.booked - 1);
+  const s = document.getElementById('bk-modal-status');
+  s.textContent = 'Booking cancelled. Seat returned to service.';
+  s.className = 'modal-status show error';
+  document.getElementById('btn-cancel-booking').style.display = 'none';
+  renderBookings(); renderDashServices(); renderServicesPanel();
+}
+
+// ── Services panel ──
+function renderServicesPanel() {
+  const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
+  const totalAvail  = CAP * 9 - totalBooked;
+  document.getElementById('svc-booked-total').textContent = totalBooked;
+  document.getElementById('svc-avail-total').textContent  = totalAvail;
+  const tbody = document.getElementById('svc-tbody');
+  tbody.innerHTML = SERVICES.map(s => {
+    const left = CAP - s.booked;
+    const pct  = Math.round((s.booked / CAP) * 100);
+    const st   = left === 0 ? 'Full' : left <= 3 ? 'Low' : 'Available';
+    const bc   = left === 0 ? 'badge-cancelled' : left <= 3 ? 'badge-pending' : 'badge-confirmed';
+    const stops = STOPS.filter((_, i) => s.times[i] !== '*N/S').map(st => 'Stop ' + st.num).join(', ');
+    return `<tr>
+      <td><strong>Service No.${s.id}</strong></td>
+      <td>${s.times.find(t => t !== '*N/S')}</td>
+      <td class="muted" style="font-size:12px;">${stops}</td>
+      <td>${CAP}</td>
+      <td>${s.booked}</td>
+      <td>${left}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;background:var(--border-sub);border-radius:3px;height:5px;overflow:hidden;min-width:60px;">
+            <div style="height:5px;border-radius:3px;width:${pct}%;background:${left===0?'#E24B4A':left<=3?'#EF9F27':'#639922'};"></div>
+          </div>
+          <span style="font-size:12px;color:var(--muted);min-width:28px;">${pct}%</span>
+        </div>
+      </td>
+      <td><span class="badge ${bc}">${st}</span></td>
+      <td><button class="btn btn-outline btn-sm" onclick="openEditSchedule(${s.id})">Edit schedule</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderServices() { renderServicesPanel(); }
+
+// ── Schedule editor ──
+let _editSchedSvcId = null;
+
+function openEditSchedule(svcId) {
+  const svc = SERVICES.find(s => s.id === svcId);
+  if (!svc) return;
+  _editSchedSvcId = svcId;
+  document.getElementById('sched-modal-title').textContent = 'Edit schedule — Service No.' + svcId;
+  const st = document.getElementById('sched-status');
+  st.className = 'modal-status'; st.textContent = '';
+
+  // Build stop rows
+  const grid = document.getElementById('sched-stops-grid');
+  grid.innerHTML = STOPS.map((stop, i) => {
+    const t   = svc.times[i];
+    const isNS = t === '*N/S';
+    // Convert "7:05" → "07:05" for time input value
+    const timeVal = isNS ? '' : t.replace(/^(\d):/, '0$1:');
+    return `<div class="sched-stop-row" id="sched-row-${i}">
+      <div class="sched-stop-num">${stop.num}</div>
+      <div class="sched-stop-info">
+        <div class="sched-stop-name">${stop.name}</div>
+        <div class="sched-stop-addr">${stop.addr}</div>
+      </div>
+      <input
+        type="time"
+        class="sched-time-input"
+        id="sched-time-${i}"
+        value="${timeVal}"
+        ${isNS ? 'disabled' : ''}
+      >
+      <label class="sched-ns-label">
+        <input
+          type="checkbox"
+          id="sched-ns-${i}"
+          ${isNS ? 'checked' : ''}
+          onchange="toggleNS(${i})"
+        >
+        Not serviced
+      </label>
+    </div>`;
+  }).join('');
+
+  openModal('modal-schedule');
+}
+
+function toggleNS(idx) {
+  const isNS  = document.getElementById('sched-ns-' + idx).checked;
+  const input = document.getElementById('sched-time-' + idx);
+  input.disabled = isNS;
+  if (isNS) input.value = '';
+  // Visually dim the row
+  document.getElementById('sched-row-' + idx).style.opacity = isNS ? '0.45' : '1';
+}
+
+function saveSchedule() {
+  const svc = SERVICES.find(s => s.id === _editSchedSvcId);
+  if (!svc) return;
+
+  const newTimes = [];
+  let hasAtLeastOneStop = false;
+  let hasError = false;
+
+  STOPS.forEach((_, i) => {
+    const isNS  = document.getElementById('sched-ns-' + i).checked;
+    const input = document.getElementById('sched-time-' + i);
+    if (isNS) {
+      newTimes.push('*N/S');
+    } else {
+      const val = input.value;
+      if (!val) {
+        input.style.borderColor = '#E24B4A';
+        hasError = true;
+        newTimes.push('');
+      } else {
+        input.style.borderColor = '';
+        // Normalise: strip leading zero from hour for display consistency
+        const [hh, mm] = val.split(':');
+        newTimes.push(parseInt(hh) + ':' + mm);
+        hasAtLeastOneStop = true;
+      }
+    }
+  });
+
+  const st = document.getElementById('sched-status');
+
+  if (hasError) {
+    st.textContent = 'Please enter a time for all active stops, or mark them as not serviced.';
+    st.className = 'modal-status show error';
+    return;
+  }
+  if (!hasAtLeastOneStop) {
+    st.textContent = 'At least one stop must be active for this service.';
+    st.className = 'modal-status show error';
+    return;
+  }
+
+  svc.times = newTimes;
+  st.textContent = 'Schedule updated for Service No.' + _editSchedSvcId + '.';
+  st.className = 'modal-status show success';
+  renderServicesPanel();
+  renderDashServices();
+  setTimeout(() => closeModal('modal-schedule'), 1200);
+}
+
+// ── Modal helpers ──
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(o => o.classList.remove('open')); });
+
+// ── Nav item click binding ──
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+init();
+</script>
+</body>
+</html>
