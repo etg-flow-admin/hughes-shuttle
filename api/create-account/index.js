@@ -5,9 +5,9 @@ const { getListItem, createListItem } = require('../shared/msLists');
 const { sendEmail, otpTemplate }      = require('../shared/email');
 
 module.exports = async function (context, req) {
-  const { name, email: raw, studentId, password } = req.body || {};
+  const { name, email: raw, studentId, roomNumber, password } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
-  if (!name || !email || !studentId || !password) {
+  if (!name || !email || !studentId || !roomNumber || !password) {
     context.res = { status: 400, body: { error: 'All fields are required.' } }; return;
   }
   if (password.length < 8) {
@@ -30,6 +30,7 @@ module.exports = async function (context, req) {
       Title:         email,
       Name:          name.trim(),
       StudentID:     studentId.trim().toUpperCase(),
+      RoomNumber:    roomNumber.trim().toUpperCase(),
       PasswordHash:  passwordHash,
       Status:        'New',
       IsAdmin:       false,

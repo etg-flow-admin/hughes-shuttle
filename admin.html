@@ -306,6 +306,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <th onclick="sortUsers('name')">Name <span class="sort-arrow">↕</span></th>
             <th onclick="sortUsers('email')">Email <span class="sort-arrow">↕</span></th>
             <th>Student ID</th>
+            <th>Room</th>
             <th onclick="sortUsers('status')">Status <span class="sort-arrow">↕</span></th>
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
@@ -456,6 +457,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="modal-field">
         <label class="modal-label">Student ID</label>
         <input class="modal-input" id="edit-user-sid" type="text">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Room Number</label>
+        <input class="modal-input" id="edit-user-room" type="text">
       </div>
       <div class="modal-field">
         <label class="modal-label">Mobile</label>
@@ -659,11 +664,12 @@ function renderUsers() {
   });
   document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
   const tbody = document.getElementById('user-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
   tbody.innerHTML = users.map(u => `<tr>
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
     <td class="muted">${esc(u.sid)}</td>
+    <td class="muted">${esc(u.roomNumber || '—')}</td>
     <td><span class="badge ${badgeCls(u.status)}">${u.status}</span></td>
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
@@ -693,6 +699,7 @@ function openEditUser(uid) {
   document.getElementById('edit-user-email').textContent = u.email;
   document.getElementById('edit-user-name').value    = u.name;
   document.getElementById('edit-user-sid').value     = u.sid;
+  document.getElementById('edit-user-room').value    = u.roomNumber || '';
   document.getElementById('edit-user-mobile').value  = u.mobile;
   document.getElementById('edit-user-accstatus').value = u.status;
   document.getElementById('edit-user-pw').value      = '';
@@ -709,6 +716,7 @@ function saveUser() {
   u.name    = document.getElementById('edit-user-name').value.trim() || u.name;
   u.sid     = document.getElementById('edit-user-sid').value.trim() || u.sid;
   u.mobile  = document.getElementById('edit-user-mobile').value.trim();
+  u.roomNumber = document.getElementById('edit-user-room').value.trim();
   u.status  = document.getElementById('edit-user-accstatus').value;
   u.isAdmin = document.getElementById('edit-user-admin').checked;
   const s = document.getElementById('edit-user-status');
@@ -733,6 +741,7 @@ function submitAddUser() {
   const name  = document.getElementById('add-name').value.trim();
   const email = document.getElementById('add-email').value.trim();
   const sid   = document.getElementById('add-sid').value.trim();
+  const room  = document.getElementById('add-room').value.trim();
   const pw    = document.getElementById('add-pw').value;
   const s     = document.getElementById('add-status');
   if (!name || !email || !sid || pw.length < 8) {
@@ -742,7 +751,7 @@ function submitAddUser() {
   const newUser = {
     id: 'u' + Date.now(), name, email, sid,
     mobile: document.getElementById('add-mobile').value.trim(),
-    status: 'New', isAdmin: document.getElementById('add-is-admin').checked, bookings: 0
+    status: 'New', isAdmin: document.getElementById('add-is-admin').checked, bookings: 0, roomNumber: room
   };
   _users.unshift(newUser);
   updateBadges();

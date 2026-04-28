@@ -73,7 +73,7 @@ module.exports = async function (context, req) {
     // Send confirmation email (fire-and-forget)
     sendEmail(
       email,
-      `Booking confirmed — Service No.${serviceNumber} on ${travelDate}`,
+      `Booking confirmed — Hughes Shuttle Service No.${serviceNumber} on ${travelDate}`,
       bookingConfirmTemplate(name, ref, serviceNumber, stop.name, depTime, travelDate)
     ).catch(e => context.log.warn('Confirm email failed:', e.message));
 

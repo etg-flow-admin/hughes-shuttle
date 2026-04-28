@@ -17,9 +17,10 @@ module.exports = async function (context, req) {
     if (!user) { context.res = { status: 404, body: { error: 'User not found.' } }; return; }
 
     const fields = {};
-    if (updates.name      !== undefined) fields.Name      = updates.name.trim();
-    if (updates.studentId !== undefined) fields.StudentID = updates.studentId.trim().toUpperCase();
-    if (updates.mobile    !== undefined) fields.Mobile    = updates.mobile.trim();
+    if (updates.name      !== undefined) fields.Name       = updates.name.trim();
+    if (updates.studentId !== undefined) fields.StudentID  = updates.studentId.trim().toUpperCase();
+    if (updates.roomNumber !== undefined) fields.RoomNumber = updates.roomNumber.trim().toUpperCase();
+    if (updates.mobile    !== undefined) fields.Mobile     = updates.mobile.trim();
     if (updates.status    !== undefined) fields.Status    = updates.status;
     if (updates.isAdmin   !== undefined) fields.IsAdmin   = updates.isAdmin === true;
     if (updates.newPassword) {

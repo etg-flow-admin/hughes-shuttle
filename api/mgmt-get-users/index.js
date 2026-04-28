@@ -8,7 +8,7 @@ module.exports = async function (context, req) {
   try {
     const items = await getListItems(
       'ShuttleUsers', '',
-      'ID,Title,Name,StudentID,Mobile,Status,IsAdmin,EmailVerified,CreatedAt,LastLoginAt',
+      'ID,Title,Name,StudentID,RoomNumber,Mobile,Status,IsAdmin,EmailVerified,CreatedAt,LastLoginAt',
       5000
     );
     const users = items.map(u => ({
@@ -16,6 +16,7 @@ module.exports = async function (context, req) {
       email:         u.Title,
       name:          u.Name,
       studentId:     u.StudentID,
+      roomNumber:    u.RoomNumber || '',
       mobile:        u.Mobile || '',
       status:        u.Status,
       isAdmin:       u.IsAdmin === true,

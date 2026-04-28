@@ -196,6 +196,10 @@
         <input class="inp" type="text" id="createStudentId" placeholder="e.g. S12345678">
       </div>
       <div class="field">
+        <label>Room Number</label>
+        <input class="inp" type="text" id="createRoomNumber" placeholder="e.g. A204">
+      </div>
+      <div class="field">
         <label>Password</label>
         <div class="pw-wrap">
           <input class="inp" type="password" id="createPw" placeholder="Min. 8 characters">
@@ -534,14 +538,16 @@ function tryCreate() {
   const name = document.getElementById('createName').value.trim();
   const email = document.getElementById('createEmail').value.trim();
   const sid   = document.getElementById('createStudentId').value.trim();
+  const room  = document.getElementById('createRoomNumber').value.trim();
   const pw    = document.getElementById('createPw').value;
   const pw2   = document.getElementById('createPw2').value;
   const err   = document.getElementById('createError');
-  if (!name || !email || !sid || pw.length < 8) {
+  if (!name || !email || !sid || !room || pw.length < 8) {
     err.textContent = 'Please fill in all fields. Password must be at least 8 characters.';
     err.classList.add('show'); return;
   }
   if (pw !== pw2) { err.textContent = 'Passwords do not match.'; err.classList.add('show'); return; }
+  window._pendingRegistration = { name, email, studentId: sid, roomNumber: room, password: pw };
   document.getElementById('verifyEmail').textContent = email;
   document.getElementById('navAvatar').textContent = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
   goTo('verifyScreen');

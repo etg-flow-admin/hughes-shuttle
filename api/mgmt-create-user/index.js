@@ -9,10 +9,10 @@ module.exports = async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
 
-  const { name, email: raw, studentId, mobile, isAdmin } = req.body || {};
+  const { name, email: raw, studentId, roomNumber, mobile, isAdmin } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
-  if (!name || !email || !studentId) {
-    context.res = { status: 400, body: { error: 'name, email and studentId are required.' } }; return;
+  if (!name || !email || !studentId || !roomNumber) {
+    context.res = { status: 400, body: { error: 'name, email, studentId and roomNumber are required.' } }; return;
   }
   try {
     const existing = await getListItem('ShuttleUsers', `Title eq '${email}'`);
@@ -25,6 +25,7 @@ module.exports = async function (context, req) {
       Title:         email,
       Name:          name.trim(),
       StudentID:     studentId.trim().toUpperCase(),
+      RoomNumber:    roomNumber.trim().toUpperCase(),
       Mobile:        (mobile || '').trim(),
       PasswordHash:  passwordHash,
       Status:        'Active',
