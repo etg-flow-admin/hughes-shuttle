@@ -1,15 +1,23 @@
 // api/shared/msLists.js
-// Microsoft Lists (SharePoint REST API) — app-only auth via client credentials
+// Microsoft Graph API — uses list IDs from app settings (same pattern as Fit4Me)
 
 const fetch = require('node-fetch');
 
-const TENANT_ID     = process.env.SHAREPOINT_TENANT_ID;
-const CLIENT_ID     = process.env.SHAREPOINT_CLIENT_ID;
-const SITE_URL      = process.env.SHAREPOINT_SITE_URL;
+const TENANT_ID  = process.env.SHAREPOINT_TENANT_ID;
+const CLIENT_ID  = process.env.SHAREPOINT_CLIENT_ID;
+const SITE_ID    = 'equitytransportgroup.sharepoint.com,7d2ff47a-ce6d-480d-ba80-0338c1eece11,0908d58e-4a2a-4a75-b2c2-6b1aefb88c5c';
+
+const LIST_IDS = {
+  ShuttleUsers:    process.env.SHAREPOINT_LIST_USERS,
+  ShuttleBookings: process.env.SHAREPOINT_LIST_BOOKINGS,
+  ShuttleServices: process.env.SHAREPOINT_LIST_SERVICES,
+};
+
+const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 
 let _tokenCache = { token: null, expiry: 0 };
 
-async function getAccessToken() {
+async function getGraphToken() {
   if (_tokenCache.token && Date.now() < _tokenCache.expiry - 60000) return _tokenCache.token;
   const { getSecret } = require('./keyVault');
   const clientSecret  = await getSecret('sharepoint-client-secret');
@@ -22,22 +30,28 @@ async function getAccessToken() {
   });
   const res  = await fetch(url, { method: 'POST', body });
   const data = await res.json();
-  if (!data.access_token) throw new Error('Failed to get SharePoint token: ' + JSON.stringify(data));
+  if (!data.access_token) throw new Error('Failed to get Graph token: ' + JSON.stringify(data));
   _tokenCache = { token: data.access_token, expiry: Date.now() + data.expires_in * 1000 };
   return data.access_token;
 }
 
+function getListId(listName) {
+  const id = LIST_IDS[listName];
+  if (!id) throw new Error(`List ID not configured for '${listName}'. Check SHAREPOINT_LIST_* app settings.`);
+  return id;
+}
+
 async function getListItems(listName, filter = '', select = '', top = 500) {
-  const token = await getAccessToken();
-  let url = `${SITE_URL}/_api/lists/getbytitle('${encodeURIComponent(listName)}')/items?$top=${top}`;
+  const token  = await getGraphToken();
+  const listId = getListId(listName);
+  let url = `${GRAPH_BASE}/${listId}/items?$expand=fields&$top=${top}`;
   if (filter) url += `&$filter=${encodeURIComponent(filter)}`;
-  if (select) url += `&$select=${encodeURIComponent(select)}`;
   const res  = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json;odata=nometadata' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`getListItems(${listName}) failed: ${JSON.stringify(data)}`);
-  return data.value || [];
+  return (data.value || []).map(item => ({ ID: item.id, ...item.fields }));
 }
 
 async function getListItem(listName, filter) {
@@ -46,35 +60,27 @@ async function getListItem(listName, filter) {
 }
 
 async function createListItem(listName, fields) {
-  const token = await getAccessToken();
-  const url   = `${SITE_URL}/_api/lists/getbytitle('${encodeURIComponent(listName)}')/items`;
-  const res   = await fetch(url, {
+  const token  = await getGraphToken();
+  const listId = getListId(listName);
+  const url    = `${GRAPH_BASE}/${listId}/items`;
+  const res    = await fetch(url, {
     method:  'POST',
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      Accept:         'application/json;odata=nometadata',
-      'Content-Type': 'application/json;odata=nometadata',
-    },
-    body: JSON.stringify(fields),
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ fields }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`createListItem(${listName}) failed: ${JSON.stringify(data)}`);
-  return data;
+  return { ID: data.id, ...data.fields };
 }
 
 async function updateListItem(listName, itemId, fields) {
-  const token = await getAccessToken();
-  const url   = `${SITE_URL}/_api/lists/getbytitle('${encodeURIComponent(listName)}')/items(${itemId})`;
-  const res   = await fetch(url, {
-    method:  'POST',
-    headers: {
-      Authorization:   `Bearer ${token}`,
-      Accept:          'application/json;odata=nometadata',
-      'Content-Type':  'application/json;odata=nometadata',
-      'IF-MATCH':      '*',
-      'X-HTTP-Method': 'MERGE',
-    },
-    body: JSON.stringify(fields),
+  const token  = await getGraphToken();
+  const listId = getListId(listName);
+  const url    = `${GRAPH_BASE}/${listId}/items/${itemId}/fields`;
+  const res    = await fetch(url, {
+    method:  'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(fields),
   });
   if (!res.ok) {
     const text = await res.text();
