@@ -66,7 +66,13 @@
 
   /* ── Nav bar ── */
   .nav-bar { background: var(--h-navy); padding: 0.8rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--h-gold); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--h-navy-dark); cursor: pointer; flex-shrink: 0; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--h-gold); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--h-navy-dark); cursor: pointer; flex-shrink: 0; position: relative; }
+  .avatar-menu { display: none; position: absolute; top: 40px; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 160px; overflow: hidden; z-index: 100; }
+  .avatar-menu.open { display: block; }
+  .avatar-menu-item { display: block; width: 100%; padding: 12px 16px; font-size: 13px; font-weight: 600; color: var(--h-navy); background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
+  .avatar-menu-item:hover { background: var(--h-gold-pale); }
+  .avatar-menu-item.danger { color: #A32D2D; }
+  .avatar-menu-divider { height: 0.5px; background: var(--h-border-sub); margin: 0; }
 
   /* ── Booking body ── */
   .booking-body { background: var(--h-offwhite); padding: 1.25rem; flex: 1; max-width: 640px; margin: 0 auto; width: 100%; }
@@ -268,7 +274,16 @@
       </div>
       <div class="logo-text" style="font-size:15px;">Hughes Shuttle</div>
     </div>
-    <div class="avatar" id="navAvatar">JD</div>
+    <div style="position:relative;">
+      <div class="avatar" id="navAvatar" onclick="toggleAvatarMenu()">JD</div>
+      <div class="avatar-menu" id="avatarMenu">
+        <div id="avatarMenuAdmin" style="display:none;">
+          <button class="avatar-menu-item" onclick="goToAdmin()">&#9881; Admin portal</button>
+          <div class="avatar-menu-divider"></div>
+        </div>
+        <button class="avatar-menu-item danger" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
   </div>
 
   <div style="background:var(--h-offwhite);flex:1;">
@@ -359,15 +374,15 @@ const STOPS = [
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
 ];
 const SERVICES = [
-  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:8  },
-  { id:2, times:['7:05', '7:15','*N/S','7:20', '7:25','*N/S'], booked:17 },
-  { id:3, times:['7:40', '7:50','*N/S','7:55', '8:05','*N/S'], booked:9  },
-  { id:4, times:['8:20', '8:30','*N/S','8:40', '8:50','*N/S'], booked:19 },
-  { id:5, times:['9:10','*N/S', '9:20','*N/S','*N/S','*N/S'], booked:22 },
-  { id:6, times:['9:30', '9:40','*N/S','9:50','10:00','*N/S'], booked:4  },
-  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'], booked:11 },
-  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'], booked:15 },
-  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'], booked:2  },
+  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0 },
+  { id:2, times:['7:05', '7:15','*N/S','7:20', '7:25','*N/S'], booked:0 },
+  { id:3, times:['7:40', '7:50','*N/S','7:55', '8:05','*N/S'], booked:0 },
+  { id:4, times:['8:20', '8:30','*N/S','8:40', '8:50','*N/S'], booked:0 },
+  { id:5, times:['9:10','*N/S', '9:20','*N/S','*N/S','*N/S'], booked:0 },
+  { id:6, times:['9:30', '9:40','*N/S','9:50','10:00','*N/S'], booked:0 },
+  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'], booked:0 },
+  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'], booked:0 },
+  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'], booked:0 },
 ];
 
 let myBookings = [];
@@ -606,6 +621,26 @@ function startResend() {
   }
 }
 
+// ── Avatar menu ──
+function toggleAvatarMenu() {
+  document.getElementById('avatarMenu').classList.toggle('open');
+}
+function goToAdmin() {
+  window.location.href = '/admin.html';
+}
+function signOut() {
+  clearSession();
+  goTo('loginScreen');
+}
+// Close menu when clicking outside
+document.addEventListener('click', function(e) {
+  const avatar = document.getElementById('navAvatar');
+  const menu   = document.getElementById('avatarMenu');
+  if (menu && !avatar.contains(e.target) && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
 // ── Session helpers ──
 function setSession(token, name, isAdmin) {
   localStorage.setItem('hs_token', token);
@@ -613,6 +648,7 @@ function setSession(token, name, isAdmin) {
   localStorage.setItem('hs_isAdmin', isAdmin ? '1' : '0');
   const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
   document.getElementById('navAvatar').textContent = initials;
+  document.getElementById('avatarMenuAdmin').style.display = isAdmin ? 'block' : 'none';
 }
 function getToken() { return localStorage.getItem('hs_token'); }
 function clearSession() {
@@ -895,9 +931,11 @@ document.getElementById('dateInput').addEventListener('change', () => {
 (function() {
   const token = getToken();
   if (token) {
-    const name = localStorage.getItem('hs_name') || '';
+    const name    = localStorage.getItem('hs_name') || '';
+    const isAdmin = localStorage.getItem('hs_isAdmin') === '1';
     const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
     document.getElementById('navAvatar').textContent = initials;
+    document.getElementById('avatarMenuAdmin').style.display = isAdmin ? 'block' : 'none';
     goTo('bookingScreen');
     loadServices();
     loadMyBookings();
