@@ -155,7 +155,7 @@
           <button class="pw-toggle" onclick="togglePw('loginPw',this)">Show</button>
         </div>
       </div>
-      <button class="btn-gold" onclick="tryLogin()">Sign in</button>
+      <button class="btn-gold" id="btnLogin" onclick="tryLogin()">Sign in</button>
       <p style="font-size:13px;color:var(--h-muted);text-align:center;margin-top:1rem;">
         <span style="color:var(--h-gold);cursor:pointer;font-weight:600;">Forgot password?</span>
       </p>
@@ -215,7 +215,7 @@
           <button class="pw-toggle" onclick="togglePw('createPw2',this)">Show</button>
         </div>
       </div>
-      <button class="btn-gold" onclick="tryCreate()">Create account</button>
+      <button class="btn-gold" id="btnCreate" onclick="tryCreate()">Create account</button>
       <div class="switch-row">Already have an account? <span class="switch-link" onclick="goTo('loginScreen')">Sign in</span></div>
     </div>
   </div>
@@ -248,7 +248,7 @@
         <input class="otp-box" id="o5" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o6')" onkeydown="otpBack(event,this,'o4')">
         <input class="otp-box" id="o6" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,null)" onkeydown="otpBack(event,this,'o5')">
       </div>
-      <button class="btn-gold" onclick="goTo('bookingScreen')">Verify &amp; activate</button>
+      <button class="btn-gold" onclick="verifyAndActivate()">Verify &amp; activate</button>
       <button class="btn-ghost" onclick="goTo('createScreen')">← Back</button>
       <div class="resend-row">
         Didn't get a code?
@@ -556,21 +556,31 @@ function tryCreate() {
   goTo('verifyScreen');
 }
 
+// ── OTP helpers ──
 function otpInput(el, nextId) {
   el.value = el.value.replace(/\D/g,'');
   el.classList.toggle('filled', el.value.length > 0);
   if (el.value && nextId) document.getElementById(nextId).focus();
   if (['o1','o2','o3','o4','o5','o6'].every(id => document.getElementById(id).value))
-    setTimeout(() => goTo('bookingScreen'), 350);
+    verifyOtp();
 }
-
 function otpBack(e, el, prevId) {
   if (e.key === 'Backspace' && !el.value && prevId) document.getElementById(prevId).focus();
+}
+function getOtpValue() {
+  return ['o1','o2','o3','o4','o5','o6'].map(id => document.getElementById(id).value).join('');
+}
+function clearOtp() {
+  ['o1','o2','o3','o4','o5','o6'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.classList.remove('filled');
+  });
 }
 
 let ri;
 function startResend() {
-  document.getElementById('resendBtn').style.display  = 'none';
+  document.getElementById('resendBtn').style.display   = 'none';
   document.getElementById('resendTimer').style.display = 'inline';
   let c = 30;
   document.getElementById('timerCount').textContent = c;
@@ -583,9 +593,316 @@ function startResend() {
       document.getElementById('resendBtn').style.display   = 'inline';
     }
   }, 1000);
+  // Re-send OTP via API
+  const email = window._pendingRegistration && window._pendingRegistration.email;
+  if (email) {
+    fetch('/api/send-2fa-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    }).catch(() => {});
+  }
 }
 
-// Init
+// ── Session helpers ──
+function setSession(token, name, isAdmin) {
+  localStorage.setItem('hs_token', token);
+  localStorage.setItem('hs_name', name);
+  localStorage.setItem('hs_isAdmin', isAdmin ? '1' : '0');
+  const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
+  document.getElementById('navAvatar').textContent = initials;
+}
+function getToken() { return localStorage.getItem('hs_token'); }
+function clearSession() {
+  localStorage.removeItem('hs_token');
+  localStorage.removeItem('hs_name');
+  localStorage.removeItem('hs_isAdmin');
+}
+
+// ── Button loading state ──
+function setLoading(btnId, loading, label) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Please wait…' : label;
+}
+
+// ── Show inline error ──
+function showError(elId, msg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearError(elId) {
+  const el = document.getElementById(elId);
+  if (el) { el.textContent = ''; el.classList.remove('show'); }
+}
+
+// ══ SIGN IN ══
+async function tryLogin() {
+  clearError('loginError');
+  const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPw').value;
+  if (!email || !password) { showError('loginError', 'Please enter your email and password.'); return; }
+
+  setLoading('btnLogin', true, 'Sign in');
+  try {
+    const res  = await fetch('/api/portal-login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data.requiresVerification) {
+        window._pendingRegistration = { email };
+        document.getElementById('verifyEmail').textContent = email;
+        goTo('verifyScreen');
+      } else {
+        showError('loginError', data.error || 'Incorrect email or password.');
+      }
+      return;
+    }
+    setSession(data.token, data.name, data.isAdmin);
+    goTo('bookingScreen');
+    loadServices();
+    loadMyBookings();
+  } catch (err) {
+    showError('loginError', 'Unable to connect. Please try again.');
+  } finally {
+    setLoading('btnLogin', false, 'Sign in');
+  }
+}
+
+// ══ CREATE ACCOUNT ══
+async function tryCreate() {
+  clearError('createError');
+  const name  = document.getElementById('createName').value.trim();
+  const email = document.getElementById('createEmail').value.trim().toLowerCase();
+  const sid   = document.getElementById('createStudentId').value.trim();
+  const room  = document.getElementById('createRoomNumber').value.trim();
+  const pw    = document.getElementById('createPw').value;
+  const pw2   = document.getElementById('createPw2').value;
+
+  if (!name || !email || !sid || !room || pw.length < 8) {
+    showError('createError', 'Please fill in all fields. Password must be at least 8 characters.');
+    return;
+  }
+  if (pw !== pw2) { showError('createError', 'Passwords do not match.'); return; }
+
+  setLoading('btnCreate', true, 'Create account');
+  try {
+    const res  = await fetch('/api/create-account', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, email, studentId: sid, roomNumber: room, password: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError('createError', data.error || 'Account creation failed.'); return; }
+
+    window._pendingRegistration = { name, email, studentId: sid, roomNumber: room, password: pw };
+    document.getElementById('verifyEmail').textContent = email;
+    const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
+    document.getElementById('navAvatar').textContent = initials;
+    goTo('verifyScreen');
+  } catch (err) {
+    showError('createError', 'Unable to connect. Please try again.');
+  } finally {
+    setLoading('btnCreate', false, 'Create account');
+  }
+}
+
+// ══ VERIFY OTP ══
+async function verifyOtp() {
+  const otp   = getOtpValue();
+  const email = window._pendingRegistration && window._pendingRegistration.email;
+  if (!email || otp.length < 6) return;
+
+  // Disable all OTP boxes during verification
+  ['o1','o2','o3','o4','o5','o6'].forEach(id => document.getElementById(id).disabled = true);
+
+  try {
+    const res  = await fetch('/api/verify-2fa', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, otp })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      clearOtp();
+      ['o1','o2','o3','o4','o5','o6'].forEach(id => {
+        document.getElementById(id).disabled = false;
+        document.getElementById(id).style.borderColor = '#E24B4A';
+      });
+      document.getElementById('o1').focus();
+      // Show error below OTP
+      const resendRow = document.getElementById('resendBtn').parentElement;
+      let errEl = document.getElementById('otpError');
+      if (!errEl) {
+        errEl = document.createElement('p');
+        errEl.id = 'otpError';
+        errEl.style.cssText = 'color:#A32D2D;font-size:13px;text-align:center;margin-top:0.5rem;';
+        resendRow.parentElement.insertBefore(errEl, resendRow);
+      }
+      errEl.textContent = data.error || 'Invalid code. Please try again.';
+      return;
+    }
+
+    setSession(data.token, data.name, data.isAdmin);
+    window._pendingRegistration = null;
+    goTo('bookingScreen');
+    loadServices();
+    loadMyBookings();
+  } catch (err) {
+    ['o1','o2','o3','o4','o5','o6'].forEach(id => document.getElementById(id).disabled = false);
+  }
+}
+
+// Also wire the Verify button
+function verifyAndActivate() { verifyOtp(); }
+
+// ══ LOAD SERVICES from API ══
+async function loadServices() {
+  const date  = document.getElementById('dateInput').value;
+  if (!date) return;
+  const token = getToken();
+  if (!token) return;
+
+  try {
+    const res  = await fetch(`/api/get-services?date=${date}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    // Merge live seat data into SERVICES array
+    (data.services || []).forEach(svc => {
+      const local = SERVICES.find(s => s.id === svc.serviceNumber);
+      if (local) {
+        local.booked = svc.booked;
+        local.times  = svc.times;
+      }
+    });
+    renderServices();
+  } catch (err) {
+    // Fall back to static data already in SERVICES
+    renderServices();
+  }
+}
+
+// ══ CONFIRM BOOKING via API ══
+async function confirmBooking() {
+  const svc   = window._selectedSvc;
+  const stop  = window._selectedStop;
+  const fStop = window._selectedFStop;
+  if (!svc || !stop) return;
+
+  const date  = document.getElementById('dateInput').value;
+  const token = getToken();
+  if (!token) { goTo('loginScreen'); return; }
+
+  const stopIdx = fStop !== 'all' ? +fStop - 1 : svc.times.findIndex(t => t !== '*N/S');
+
+  const btn = document.querySelector('#bookingForm .btn-gold');
+  if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
+
+  try {
+    const res  = await fetch('/api/confirm-booking', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body:    JSON.stringify({ serviceNumber: svc.id, stopNumber: stop.num, travelDate: date })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Booking failed. Please try again.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+      return;
+    }
+
+    // Update local seat count
+    svc.booked = Math.min(svc.booked + 1, CAP);
+
+    // Add to my bookings list
+    const stopName = stop.name;
+    const depTime  = svc.times[stopIdx];
+    const dateStr  = new Date(date + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' });
+    addMyBooking({ ref: data.ref, svcId: svc.id, stopNum: stop.num, stopName, depTime, date: dateStr });
+
+    cancelBooking();
+    renderServices();
+    switchTab('my');
+  } catch (err) {
+    alert('Unable to connect. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+  }
+}
+
+// ══ MY BOOKINGS ══
+let _myBookings = [];
+function addMyBooking(b) {
+  _myBookings.unshift(b);
+  renderMyBookings();
+}
+async function loadMyBookings() {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const res  = await fetch('/api/get-my-bookings', { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const data = await res.json();
+    _myBookings = (data.bookings || []).map(b => ({
+      ref:      b.ref,
+      svcId:    b.serviceNumber,
+      stopNum:  b.stopNumber,
+      stopName: STOPS[b.stopNumber - 1]?.name || `Stop ${b.stopNumber}`,
+      depTime:  b.departureTime,
+      date:     new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }),
+      status:   b.status,
+      cancelled: b.status === 'Cancelled'
+    }));
+    renderMyBookings();
+  } catch (err) { /* silently fail */ }
+}
+function renderMyBookings() {
+  const list = document.getElementById('myBookingsList');
+  if (!_myBookings.length) {
+    list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings yet.</div>';
+    return;
+  }
+  list.innerHTML = _myBookings.map(b => `
+    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.55;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
+          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">${b.date} · Stop ${b.stopNum} · ${b.depTime} · 1 seat</div>
+        </div>
+        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
+      </div>
+      <div class="booking-ref">Ref: <span>${b.ref}</span></div>
+    </div>`).join('');
+}
+
+// ══ DATE CHANGE: reload live seats ══
+document.getElementById('dateInput').addEventListener('change', () => {
+  if (getToken()) loadServices(); else renderServices();
+});
+
+// ══ CHECK EXISTING SESSION ON LOAD ══
+(function() {
+  const token = getToken();
+  if (token) {
+    const name = localStorage.getItem('hs_name') || '';
+    const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'U';
+    document.getElementById('navAvatar').textContent = initials;
+    goTo('bookingScreen');
+    loadServices();
+    loadMyBookings();
+  }
+})();
+
+// ── Init ──
 document.getElementById('dateInput').valueAsDate = new Date();
 renderServices();
 </script>
