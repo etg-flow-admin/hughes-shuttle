@@ -1,45 +1,56 @@
 // api/shared/email.js
-const fetch        = require('node-fetch');
-const crypto       = require('crypto');
-const { getSecret } = require('./keyVault');
+// Sends email via Microsoft Graph API using the hughes-shuttle-sp app registration
+// Sends from noreply@equitytransport.com.au
 
-const FROM_ADDRESS = process.env.EMAIL_FROM || 'noreply@hughes.com.au';
+const fetch = require('node-fetch');
+
+const FROM_ADDRESS = 'Shuttlebus@hughes.com.au';
+const TENANT_ID    = process.env.SHAREPOINT_TENANT_ID;
+const CLIENT_ID    = process.env.SHAREPOINT_CLIENT_ID;
+
+let _tokenCache = { token: null, expiry: 0 };
+
+async function getGraphToken() {
+  if (_tokenCache.token && Date.now() < _tokenCache.expiry - 60000) return _tokenCache.token;
+  const { getSecret } = require('./keyVault');
+  const clientSecret  = await getSecret('sharepoint-client-secret');
+  const url  = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type:    'client_credentials',
+    client_id:     CLIENT_ID,
+    client_secret: clientSecret,
+    scope:         'https://graph.microsoft.com/.default',
+  });
+  const res  = await fetch(url, { method: 'POST', body });
+  const data = await res.json();
+  if (!data.access_token) throw new Error('Failed to get Graph token: ' + JSON.stringify(data));
+  _tokenCache = { token: data.access_token, expiry: Date.now() + data.expires_in * 1000 };
+  return data.access_token;
+}
 
 async function sendEmail(to, subject, htmlBody) {
-  const connectionString = await getSecret('comm-services-connection');
-  const endpointMatch    = connectionString.match(/endpoint=([^;]+)/i);
-  const keyMatch         = connectionString.match(/accesskey=([^;]+)/i);
-  if (!endpointMatch || !keyMatch) throw new Error('Invalid COMM_SERVICES_CONNECTION format');
-
-  const endpoint  = endpointMatch[1].replace(/\/$/, '');
-  const accessKey = keyMatch[1];
-  const url       = `${endpoint}/emails:send?api-version=2023-03-31`;
-
-  const body     = JSON.stringify({
-    senderAddress: FROM_ADDRESS,
-    recipients:    { to: [{ address: to }] },
-    content:       { subject, html: htmlBody },
-  });
-
-  const date     = new Date().toUTCString();
-  const bodyHash = crypto.createHash('sha256').update(body).digest('base64');
-  const parsedUrl     = new URL(url);
-  const pathAndQuery  = parsedUrl.pathname + parsedUrl.search;
-  const stringToSign  = `POST\n${pathAndQuery}\n${date};${parsedUrl.host};${bodyHash}`;
-  const signature     = crypto.createHmac('sha256', Buffer.from(accessKey, 'base64')).update(stringToSign).digest('base64');
-
-  const res = await fetch(url, {
+  const token = await getGraphToken();
+  const url   = `https://graph.microsoft.com/v1.0/users/${FROM_ADDRESS}/sendMail`;
+  const res   = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type':          'application/json',
-      'Date':                  date,
-      'x-ms-date':             date,
-      'x-ms-content-sha256':   bodyHash,
-      'Authorization':         `HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=${signature}`,
+      Authorization:  `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    body,
+    body: JSON.stringify({
+      message: {
+        subject,
+        body:         { contentType: 'HTML', content: htmlBody },
+        toRecipients: [{ emailAddress: { address: to } }],
+        from:         { emailAddress: { address: FROM_ADDRESS } },
+      },
+      saveToSentItems: false,
+    }),
   });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Email failed (${res.status}): ${t}`); }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Email send failed (${res.status}): ${text}`);
+  }
   return true;
 }
 
