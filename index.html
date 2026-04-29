@@ -586,10 +586,16 @@ function renderMyBookings() {
 function cancelBooking() {
   document.getElementById('bookingForm').style.display = 'none';
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  const btn = document.querySelector('#bookingForm .btn-gold');
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
 }
 
 function switchTab(t) {
   document.getElementById('panelBook').style.display = t === 'book' ? 'block' : 'none';
+  if (t === 'book') {
+    const btn = document.querySelector('#bookingForm .btn-gold');
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+  }
   document.getElementById('panelMy').style.display   = t === 'my'   ? 'block' : 'none';
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
   document.getElementById('tabMy').className   = 'tab' + (t === 'my'  ? ' active' : '');
