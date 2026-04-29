@@ -23,18 +23,17 @@ async function getSecret(name) {
       return secret.value;
     }
   } catch (err) {
-    // Fall through to env var fallback
+    console.error(`[KeyVault] Failed to get secret '${name}': ${err.message} | KEY_VAULT_URL=${KEY_VAULT_URL || 'NOT SET'}`);
   }
-  // Local dev fallback — map secret name to env var
+  // Local dev fallback
   const envMap = {
-    'jwt-secret':                    process.env.JWT_SECRET,
-    'sharepoint-client-secret':      process.env.SHAREPOINT_CLIENT_SECRET,
-    'comm-services-connection':      process.env.COMM_SERVICES_CONNECTION,
-    'azure-storage-connection':      process.env.AZURE_STORAGE_CONNECTION_STRING,
+    'jwt-secret':               process.env.JWT_SECRET,
+    'sharepoint-client-secret': process.env.SHAREPOINT_CLIENT_SECRET,
+    'azure-storage-connection': process.env.AZURE_STORAGE_CONNECTION_STRING,
   };
   const val = envMap[name] || process.env[name.toUpperCase().replace(/-/g, '_')];
   if (val) { _cache[name] = val; return val; }
-  throw new Error(`Secret '${name}' not found in Key Vault or environment.`);
+  throw new Error(`[KeyVault] Secret '${name}' not found in Key Vault or environment. KEY_VAULT_URL=${KEY_VAULT_URL || 'NOT SET'}`);
 }
 
 module.exports = { getSecret };

@@ -1,10 +1,11 @@
 // POST /api/send-2fa-code
 // { email } → { sent: true }  — resend OTP for email verification
 const bcrypt = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, updateListItem } = require('../shared/msLists');
 const { sendEmail, otpTemplate }      = require('../shared/email');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('send-2fa-code', async function (context, req) {
   const email = ((req.body && req.body.email) || '').toLowerCase().trim();
   if (!email) { context.res = { status: 400, body: { error: 'Email required.' } }; return; }
   try {
@@ -21,4 +22,4 @@ module.exports = async function (context, req) {
     context.log.error('send-2fa-code:', err.message);
     context.res = { status: 200, body: { sent: true } }; // Always succeed silently
   }
-};
+});

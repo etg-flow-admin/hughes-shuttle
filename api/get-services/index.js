@@ -1,10 +1,11 @@
 // GET /api/get-services?date=YYYY-MM-DD
 // Returns schedule + live seat availability from Table Storage
 const { verifyToken, authError }  = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItems }            = require('../shared/msLists');
 const { getAvailabilityForDate, CAPACITY } = require('../shared/tableStorage');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('get-services', async function (context, req) {
   try { await verifyToken(req); }
   catch (err) { authError(context, err); return; }
 
@@ -50,5 +51,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('get-services:', err.message);
     context.res = { status: 500, body: { error: 'Failed to load services.' } };
+    throw err;
   }
-};
+});

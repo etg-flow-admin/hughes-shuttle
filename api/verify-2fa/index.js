@@ -1,11 +1,12 @@
 // POST /api/verify-2fa
 // { email, otp } → { token, name, isAdmin }
 const bcrypt        = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const jwt           = require('jsonwebtoken');
 const { getListItem, updateListItem } = require('../shared/msLists');
 const { getSecret } = require('../shared/keyVault');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('verify-2fa', async function (context, req) {
   const { email: raw, otp } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
   if (!email || !otp) {
@@ -36,5 +37,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('verify-2fa:', err.message);
     context.res = { status: 500, body: { error: 'Verification failed. Please try again.' } };
+    throw err;
   }
-};
+});

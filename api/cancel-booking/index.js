@@ -1,10 +1,11 @@
 // POST /api/cancel-booking
 // { ref } — student cancels their own booking, returns seat to Table Storage
 const { verifyToken, authError }      = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, updateListItem } = require('../shared/msLists');
 const { releaseSeat }                 = require('../shared/tableStorage');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('cancel-booking', async function (context, req) {
   let payload;
   try { payload = await verifyToken(req); }
   catch (err) { authError(context, err); return; }
@@ -32,5 +33,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('cancel-booking:', err.message);
     context.res = { status: 500, body: { error: 'Cancellation failed. Please try again.' } };
+    throw err;
   }
-};
+});

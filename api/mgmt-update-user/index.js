@@ -1,9 +1,10 @@
 // POST /api/mgmt-update-user
 const bcrypt = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const { requireAdmin, authError }     = require('../shared/auth');
 const { getListItem, updateListItem } = require('../shared/msLists');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-update-user', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
 
@@ -38,5 +39,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-update-user:', err.message);
     context.res = { status: 500, body: { error: 'Update failed.' } };
+    throw err;
   }
-};
+});

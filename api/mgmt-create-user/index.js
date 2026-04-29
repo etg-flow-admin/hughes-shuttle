@@ -1,11 +1,12 @@
 // POST /api/mgmt-create-user
 const bcrypt = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const crypto = require('crypto');
 const { requireAdmin, authError }     = require('../shared/auth');
 const { getListItem, createListItem } = require('../shared/msLists');
 const { sendEmail, welcomeTemplate }  = require('../shared/email');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-create-user', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
 
@@ -39,5 +40,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-create-user:', err.message);
     context.res = { status: 500, body: { error: 'Failed to create user.' } };
+    throw err;
   }
-};
+});

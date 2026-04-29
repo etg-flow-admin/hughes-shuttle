@@ -1,8 +1,9 @@
 // GET /api/mgmt-get-users
 const { requireAdmin, authError } = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItems }            = require('../shared/msLists');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-get-users', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
   try {
@@ -28,5 +29,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-get-users:', err.message);
     context.res = { status: 500, body: { error: 'Failed to load users.' } };
+    throw err;
   }
-};
+});

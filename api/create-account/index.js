@@ -1,10 +1,11 @@
 // POST /api/create-account
 // { name, email, studentId, password } → { sent: true }
 const bcrypt = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, createListItem } = require('../shared/msLists');
 const { sendEmail, otpTemplate }      = require('../shared/email');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('create-account', async function (context, req) {
   const { name, email: raw, studentId, roomNumber, password } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
   if (!name || !email || !studentId || !roomNumber || !password) {
@@ -45,5 +46,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('create-account:', err.message);
     context.res = { status: 500, body: { error: 'Account creation failed. Please try again.' } };
+    throw err;
   }
-};
+});

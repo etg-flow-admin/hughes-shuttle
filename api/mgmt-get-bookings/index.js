@@ -1,8 +1,9 @@
 // GET /api/mgmt-get-bookings?date=YYYY-MM-DD&serviceNumber=1&status=Confirmed
 const { requireAdmin, authError } = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItems }            = require('../shared/msLists');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-get-bookings', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
   try {
@@ -36,5 +37,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-get-bookings:', err.message);
     context.res = { status: 500, body: { error: 'Failed to load bookings.' } };
+    throw err;
   }
-};
+});

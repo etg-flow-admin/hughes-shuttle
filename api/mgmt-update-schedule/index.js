@@ -1,9 +1,10 @@
 // POST /api/mgmt-update-schedule
 // { serviceNumber, times: ['06:45','*N/S','06:55','*N/S','*N/S','*N/S'] }
 const { requireAdmin, authError }     = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, updateListItem, createListItem } = require('../shared/msLists');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-update-schedule', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
 
@@ -37,5 +38,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-update-schedule:', err.message);
     context.res = { status: 500, body: { error: 'Schedule update failed.' } };
+    throw err;
   }
-};
+});

@@ -2,6 +2,7 @@
 // { serviceNumber, stopNumber, travelDate }
 // Books exactly 1 seat using Azure Table Storage atomic ETag concurrency
 const { verifyToken, authError }      = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, createListItem } = require('../shared/msLists');
 const { bookSeat }                    = require('../shared/tableStorage');
 const { sendEmail, bookingConfirmTemplate } = require('../shared/email');
@@ -15,7 +16,7 @@ const STOPS = [
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
 ];
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('confirm-booking', async function (context, req) {
   let payload;
   try { payload = await verifyToken(req); }
   catch (err) { authError(context, err); return; }
@@ -83,5 +84,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('confirm-booking:', err.message);
     context.res = { status: 500, body: { error: 'Booking failed. Please try again.' } };
+    throw err;
   }
-};
+});

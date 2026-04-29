@@ -1,10 +1,11 @@
 // POST /api/mgmt-cancel-booking
 // { ref } — admin cancels any booking, returns seat to Table Storage
 const { requireAdmin, authError }     = require('../shared/auth');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItem, updateListItem } = require('../shared/msLists');
 const { releaseSeat }                 = require('../shared/tableStorage');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('mgmt-cancel-booking', async function (context, req) {
   try { await requireAdmin(req); }
   catch (err) { authError(context, err); return; }
 
@@ -26,5 +27,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('mgmt-cancel-booking:', err.message);
     context.res = { status: 500, body: { error: 'Cancellation failed.' } };
+    throw err;
   }
-};
+});

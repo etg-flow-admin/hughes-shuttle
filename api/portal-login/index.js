@@ -1,11 +1,12 @@
 // POST /api/portal-login
 // { email, password } → { token, name, isAdmin }
 const bcrypt        = require('bcrypt');
+const { wrapHandler }    = require('../shared/logger');
 const jwt           = require('jsonwebtoken');
 const { getListItem, updateListItem } = require('../shared/msLists');
 const { getSecret } = require('../shared/keyVault');
 
-module.exports = async function (context, req) {
+module.exports = wrapHandler('portal-login', async function (context, req) {
   const { email: raw, password } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
   if (!email || !password) {
@@ -35,5 +36,6 @@ module.exports = async function (context, req) {
   } catch (err) {
     context.log.error('portal-login:', err.message);
     context.res = { status: 500, body: { error: 'Login failed. Please try again.' } };
+    throw err;
   }
-};
+});
