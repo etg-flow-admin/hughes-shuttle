@@ -418,28 +418,9 @@
 
       <!-- MY BOOKINGS PANEL -->
       <div id="panelMy" style="display:none;">
-        <p class="sel-label">Upcoming</p>
+        <p class="sel-label">My bookings</p>
         <div id="myBookingsList">
-          <div class="my-booking-card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.2</div>
-                <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Tomorrow · Stop 1 · 07:05 · 1 seat</div>
-              </div>
-              <span class="seat-pill pill-ok">Confirmed</span>
-            </div>
-            <div class="booking-ref">Ref: <span>SHT-4821</span></div>
-          </div>
-          <div class="my-booking-card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.5</div>
-                <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Friday · Stop 4 · 08:40 · 2 seats</div>
-              </div>
-              <span class="seat-pill pill-ok">Confirmed</span>
-            </div>
-            <div class="booking-ref">Ref: <span>SHT-4835</span></div>
-          </div>
+          <div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">Loading…</div>
         </div>
       </div>
     </div>
@@ -1102,8 +1083,33 @@ function renderMyBookings() {
         </div>
         <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>
-      <div class="booking-ref">Ref: <span>${b.ref}</span></div>
+      <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
+        ${!b.cancelled ? `<button onclick="cancelMyBooking('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
+      </div>
     </div>`).join('');
+}
+
+async function cancelMyBooking(ref) {
+  if (!confirm('Cancel this booking? Your seat will be released.')) return;
+  const token = getToken();
+  if (!token) return;
+  try {
+    const res  = await fetch(API_BASE + '/api/cancel-booking', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body:    JSON.stringify({ ref })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Cancellation failed.'); return; }
+    const b = _myBookings.find(b => b.ref === ref);
+    if (b) b.cancelled = true;
+    renderMyBookings();
+    // Refresh seat counts on booking tab
+    loadServices();
+  } catch (err) {
+    alert('Unable to connect. Please try again.');
+  }
 }
 
 // ══ DATE CHANGE: reload live seats ══
