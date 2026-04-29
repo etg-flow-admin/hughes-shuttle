@@ -195,7 +195,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
   <div class="nav-right">
     <span class="nav-admin-name">Signed in as <strong style="color:var(--gold);">Admin User</strong></span>
-    <button class="nav-signout" onclick="alert('Sign out')">Sign out</button>
+    <button class="nav-signout" onclick="signOut()">Sign out</button>
   </div>
 </nav>
 
@@ -366,8 +366,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="page-header">
         <div><div class="page-title">All bookings</div><div class="page-sub">Current and upcoming shuttle bookings</div></div>
         <div class="header-actions">
-          <input type="date" class="filter-select" id="booking-date-filter" onchange="renderBookings()">
-          <select class="filter-select" id="booking-svc-filter" onchange="renderBookings()">
+          <input type="date" class="filter-select" id="booking-date-filter" onchange="reloadBookings()">
+          <select class="filter-select" id="booking-svc-filter" onchange="reloadBookings()">
             <option value="all">All services</option>
             <option value="1">Service 1</option><option value="2">Service 2</option>
             <option value="3">Service 3</option><option value="4">Service 4</option>
@@ -375,7 +375,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <option value="7">Service 7</option><option value="8">Service 8</option>
             <option value="9">Service 9</option>
           </select>
-          <select class="filter-select" id="booking-status-filter" onchange="renderBookings()">
+          <select class="filter-select" id="booking-status-filter" onchange="reloadBookings()">
             <option value="all">All statuses</option>
             <option value="Confirmed">Confirmed</option>
             <option value="Cancelled">Cancelled</option>
@@ -399,7 +399,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="page-header">
         <div><div class="page-title">Booking history</div><div class="page-sub">Historical record of all shuttle bookings</div></div>
         <div class="header-actions">
-          <select class="filter-select" id="hist-filter" onchange="renderHistory()">
+          <select class="filter-select" id="hist-filter" onchange="reloadHistory()">
             <option value="all">All bookings</option>
             <option value="Confirmed">Confirmed only</option>
             <option value="Cancelled">Cancelled only</option>
@@ -527,6 +527,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
+const API_BASE = 'https://hughes-shuttle-api-b0c8grbzbheactam.australiaeast-01.azurewebsites.net';
 const CAP = 22;
 const STOPS = [
   { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
@@ -536,72 +537,159 @@ const STOPS = [
   { num:5, name:'City Campus East',             addr:'Business School' },
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
 ];
-const SERVICES = [
-  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:8  },
-  { id:2, times:['7:05', '7:15','*N/S','7:20', '7:25','*N/S'], booked:17 },
-  { id:3, times:['7:40', '7:50','*N/S','7:55', '8:05','*N/S'], booked:9  },
-  { id:4, times:['8:20', '8:30','*N/S','8:40', '8:50','*N/S'], booked:19 },
-  { id:5, times:['9:10','*N/S', '9:20','*N/S','*N/S','*N/S'], booked:22 },
-  { id:6, times:['9:30', '9:40','*N/S','9:50','10:00','*N/S'], booked:4  },
-  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'], booked:11 },
-  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'], booked:15 },
-  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'], booked:2  },
+
+// Live data — populated from API
+let SERVICES = [
+  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0 },
+  { id:2, times:['7:05','7:15','*N/S','7:20','7:25','*N/S'],   booked:0 },
+  { id:3, times:['7:40','7:50','*N/S','7:55','8:05','*N/S'],   booked:0 },
+  { id:4, times:['8:20','8:30','*N/S','8:40','8:50','*N/S'],   booked:0 },
+  { id:5, times:['9:10','*N/S','9:20','*N/S','*N/S','*N/S'],   booked:0 },
+  { id:6, times:['9:30','9:40','*N/S','9:50','10:00','*N/S'],  booked:0 },
+  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'],booked:0 },
+  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'],booked:0 },
+  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'],booked:0 },
 ];
 
-// ── Sample data ──
-let _users = [
-  { id:'u1', name:'Jane Doe',      email:'jane.doe@uni.edu.au',     sid:'S10012345', mobile:'0411 111 111', status:'Active',    isAdmin:false, bookings:7  },
-  { id:'u2', name:'Tom Nguyen',    email:'t.nguyen@uni.edu.au',     sid:'S10023456', mobile:'0422 222 222', status:'Active',    isAdmin:false, bookings:12 },
-  { id:'u3', name:'Sarah Blake',   email:'s.blake@uni.edu.au',      sid:'S10034567', mobile:'0433 333 333', status:'Suspended', isAdmin:false, bookings:3  },
-  { id:'u4', name:'Marcus Lee',    email:'m.lee@uni.edu.au',        sid:'S10045678', mobile:'0444 444 444', status:'Active',    isAdmin:false, bookings:20 },
-  { id:'u5', name:'Priya Sharma',  email:'p.sharma@uni.edu.au',     sid:'S10056789', mobile:'0455 555 555', status:'Active',    isAdmin:true,  bookings:9  },
-  { id:'u6', name:'Alex Thornton', email:'a.thornton@uni.edu.au',   sid:'S10067890', mobile:'0466 666 666', status:'New',       isAdmin:false, bookings:0  },
-];
-
-let _bookings = [
-  { ref:'SHT-4821', userId:'u1', name:'Jane Doe',      svc:2, stopNum:1, time:'7:05',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 08:14' },
-  { ref:'SHT-4822', userId:'u2', name:'Tom Nguyen',    svc:3, stopNum:4, time:'7:55',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 08:22' },
-  { ref:'SHT-4823', userId:'u4', name:'Marcus Lee',    svc:1, stopNum:1, time:'06:45', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 09:01' },
-  { ref:'SHT-4824', userId:'u5', name:'Priya Sharma',  svc:4, stopNum:2, time:'8:30',  seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 09:45' },
-  { ref:'SHT-4825', userId:'u2', name:'Tom Nguyen',    svc:7, stopNum:4, time:'10:35', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 10:00' },
-  { ref:'SHT-4826', userId:'u1', name:'Jane Doe',      svc:6, stopNum:1, time:'9:30',  seats:1, status:'Cancelled', date:'2026-04-18', bookedAt:'2026-04-17 10:15' },
-  { ref:'SHT-4827', userId:'u4', name:'Marcus Lee',    svc:9, stopNum:2, time:'11:55', seats:1, status:'Confirmed', date:'2026-04-18', bookedAt:'2026-04-17 10:30' },
-  { ref:'SHT-4828', userId:'u6', name:'Alex Thornton', svc:8, stopNum:6, time:'11:40', seats:1, status:'Pending',   date:'2026-04-18', bookedAt:'2026-04-17 11:00' },
-  { ref:'SHT-4800', userId:'u3', name:'Sarah Blake',   svc:2, stopNum:1, time:'7:05',  seats:1, status:'Confirmed', date:'2026-04-16', bookedAt:'2026-04-15 09:10' },
-  { ref:'SHT-4801', userId:'u2', name:'Tom Nguyen',    svc:5, stopNum:3, time:'9:20',  seats:1, status:'Cancelled', date:'2026-04-16', bookedAt:'2026-04-15 10:05' },
-  { ref:'SHT-4780', userId:'u4', name:'Marcus Lee',    svc:3, stopNum:4, time:'7:55',  seats:1, status:'Confirmed', date:'2026-04-15', bookedAt:'2026-04-14 08:00' },
-  { ref:'SHT-4781', userId:'u1', name:'Jane Doe',      svc:6, stopNum:1, time:'9:30',  seats:1, status:'Confirmed', date:'2026-04-15', bookedAt:'2026-04-14 08:45' },
-];
-
+let _users    = [];
+let _bookings = [];
 let _userSort = { col:'name', dir:'asc' };
-let _editUserId = null;
-let _editBookingRef = null;
+let _editUserEmail   = null;
+let _editBookingRef  = null;
+let _editSchedSvcId  = null;
+let _token = null;
+
+// ── Auth ──
+function getToken() {
+  if (_token) return _token;
+  _token = localStorage.getItem('hs_token');
+  return _token;
+}
+function clearSession() {
+  localStorage.removeItem('hs_token');
+  localStorage.removeItem('hs_name');
+  localStorage.removeItem('hs_isAdmin');
+  _token = null;
+}
+function signOut() {
+  clearSession();
+  window.location.href = '/index.html';
+}
+async function authFetch(url, opts = {}) {
+  const token = getToken();
+  if (!token) { window.location.href = '/index.html'; return null; }
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}), Authorization: `Bearer ${token}` };
+  const res = await fetch(API_BASE + url, { ...opts, headers });
+  if (res.status === 401 || res.status === 403) { signOut(); return null; }
+  return res;
+}
+
+// ── Helpers ──
+function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function badgeCls(st) { return st==='Active'?'badge-active':st==='Suspended'?'badge-suspended':st==='New'?'badge-new':'badge-inactive'; }
+function bkBadge(st)  { return st==='Confirmed'?'badge-confirmed':st==='Cancelled'?'badge-cancelled':'badge-pending'; }
+function today() { return new Date().toISOString().slice(0,10); }
+function showStatus(elId, msg, type) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'modal-status show ' + (type || 'success');
+}
 
 // ── Init ──
-function init() {
+async function init() {
+  const token = getToken();
+  if (!token) { window.location.href = '/index.html'; return; }
+  // Check isAdmin
+  const isAdmin = localStorage.getItem('hs_isAdmin');
+  if (isAdmin !== '1') { window.location.href = '/index.html'; return; }
+
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  document.getElementById('booking-date-filter').value = '2026-04-18';
+  document.getElementById('booking-date-filter').value = today();
+
+  await Promise.all([ loadUsers(), loadServices() ]);
+  await loadBookings();
   updateBadges();
   renderDashServices();
-  renderServices();
+}
+
+// ── Load users ──
+async function loadUsers() {
+  const res = await authFetch('/api/mgmt-get-users');
+  if (!res) return;
+  const data = await res.json();
+  _users = (data.users || []).map(u => ({
+    id:           u.email,   // use email as unique key
+    email:        u.email,
+    name:         u.name,
+    sid:          u.studentId,
+    roomNumber:   u.roomNumber || '',
+    mobile:       u.mobile || '',
+    status:       u.status,
+    isAdmin:      u.isAdmin,
+    emailVerified:u.emailVerified,
+    createdAt:    u.createdAt,
+    lastLoginAt:  u.lastLoginAt,
+    bookings:     0,  // will be computed from bookings
+  }));
+}
+
+// ── Load services + live seat counts ──
+async function loadServices() {
+  const res = await authFetch('/api/get-services?date=' + today());
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  (data.services || []).forEach(svc => {
+    const local = SERVICES.find(s => s.id === svc.serviceNumber);
+    if (local) { local.booked = svc.booked; local.times = svc.times; }
+  });
+}
+
+// ── Load bookings ──
+async function loadBookings(date, svcFilter, statusFilter) {
+  let url = '/api/mgmt-get-bookings?';
+  if (date)        url += 'date=' + date + '&';
+  if (svcFilter && svcFilter !== 'all') url += 'serviceNumber=' + svcFilter + '&';
+  if (statusFilter && statusFilter !== 'all') url += 'status=' + statusFilter + '&';
+  const res = await authFetch(url);
+  if (!res) return;
+  const data = await res.json();
+  _bookings = (data.bookings || []).map(b => ({
+    ref:       b.ref,
+    userEmail: b.userEmail,
+    name:      b.name,
+    sid:       b.studentId,
+    svc:       b.serviceNumber,
+    stopNum:   b.stopNumber,
+    time:      b.departureTime,
+    seats:     1,
+    status:    b.status,
+    date:      b.travelDate,
+    bookedAt:  b.bookedAt ? b.bookedAt.replace('T',' ').slice(0,16) : '',
+  }));
+  // Update booking counts on users
+  const counts = {};
+  _bookings.filter(b => b.status !== 'Cancelled').forEach(b => {
+    counts[b.userEmail] = (counts[b.userEmail] || 0) + 1;
+  });
+  _users.forEach(u => { u.bookings = counts[u.email] || 0; });
 }
 
 function updateBadges() {
-  document.getElementById('badge-users').textContent = _users.length;
-  document.getElementById('badge-bookings').textContent = _bookings.filter(b => b.date === '2026-04-18' && b.status !== 'Cancelled').length;
+  document.getElementById('badge-users').textContent    = _users.length;
+  document.getElementById('badge-bookings').textContent = _bookings.filter(b => b.status !== 'Cancelled').length;
   const stats = computeUserStats();
-  document.getElementById('u-total').textContent = stats.total;
-  document.getElementById('u-active').textContent = stats.active;
+  document.getElementById('u-total').textContent     = stats.total;
+  document.getElementById('u-active').textContent    = stats.active;
   document.getElementById('u-suspended').textContent = stats.suspended;
-  document.getElementById('u-admins').textContent = stats.admins;
+  document.getElementById('u-admins').textContent    = stats.admins;
 }
-
 function computeUserStats() {
   return {
-    total: _users.length,
-    active: _users.filter(u => u.status === 'Active').length,
+    total:     _users.length,
+    active:    _users.filter(u => u.status === 'Active').length,
     suspended: _users.filter(u => u.status === 'Suspended').length,
-    admins: _users.filter(u => u.isAdmin).length,
+    admins:    _users.filter(u => u.isAdmin).length,
   };
 }
 
@@ -612,32 +700,26 @@ function switchPanel(key) {
   document.getElementById('panel-' + key).classList.add('active');
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
-  if (key === 'bookings') renderBookings();
-  if (key === 'history')  renderHistory();
-  if (key === 'services') renderServicesPanel();
+  if (key === 'bookings') { reloadBookings(); }
+  if (key === 'history')  { reloadHistory(); }
+  if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
 }
-
-function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function badgeCls(st) { return st === 'Active' ? 'badge-active' : st === 'Suspended' ? 'badge-suspended' : st === 'New' ? 'badge-new' : 'badge-inactive'; }
-function bkBadge(st) { return st === 'Confirmed' ? 'badge-confirmed' : st === 'Cancelled' ? 'badge-cancelled' : 'badge-pending'; }
 
 // ── Dashboard services ──
 function renderDashServices() {
   const tbody = document.getElementById('dash-services-body');
   tbody.innerHTML = SERVICES.map(s => {
     const left = CAP - s.booked;
-    const full = left === 0;
-    const low  = left <= 3 && !full;
-    const stops = STOPS.filter((_, i) => s.times[i] !== '*N/S').length;
+    const full = left === 0, low = left <= 3 && !full;
     return `<tr>
       <td><strong>Service No.${s.id}</strong></td>
-      <td>${s.times.find(t => t !== '*N/S')}</td>
+      <td>${s.times.find(t => t !== '*N/S') || '—'}</td>
       <td>${s.booked} / ${CAP}</td>
       <td>${left}</td>
-      <td><span class="badge ${full ? 'badge-cancelled' : low ? 'badge-pending' : 'badge-confirmed'}">${full ? 'Full' : low ? 'Low' : 'Available'}</span></td>
+      <td><span class="badge ${full?'badge-cancelled':low?'badge-pending':'badge-confirmed'}">${full?'Full':low?'Low':'Available'}</span></td>
     </tr>`;
   }).join('');
-  const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
+  const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
   document.getElementById('ds-seats').textContent = totalBooked + ' / ' + (CAP * 9);
 }
 
@@ -649,10 +731,10 @@ function sortUsers(col) {
 }
 
 function renderUsers() {
-  const q      = (document.getElementById('user-search').value || '').toLowerCase();
-  const fStat  = document.getElementById('user-status-filter').value;
-  let users    = _users.filter(u => {
-    const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.sid.toLowerCase().includes(q);
+  const q     = (document.getElementById('user-search').value || '').toLowerCase();
+  const fStat = document.getElementById('user-status-filter').value;
+  let users   = _users.filter(u => {
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.sid||'').toLowerCase().includes(q);
     const matchS = fStat === 'all' || u.status === fStat;
     return matchQ && matchS;
   });
@@ -669,123 +751,179 @@ function renderUsers() {
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
     <td class="muted">${esc(u.sid)}</td>
-    <td class="muted">${esc(u.roomNumber || '—')}</td>
+    <td class="muted">${esc(u.roomNumber||'—')}</td>
     <td><span class="badge ${badgeCls(u.status)}">${u.status}</span></td>
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
     <td>
       <label class="toggle" title="${u.status === 'Active' ? 'Active' : 'Suspended'}">
-        <input type="checkbox" ${u.status === 'Active' ? 'checked' : ''} onchange="quickToggleAccess('${u.id}', this.checked)">
+        <input type="checkbox" ${u.status==='Active'?'checked':''} onchange="quickToggleAccess('${esc(u.email)}', this.checked)">
         <span class="toggle-slider"></span>
       </label>
     </td>
-    <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${u.id}')">Edit</button></td>
+    <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button></td>
   </tr>`).join('');
 }
 
-function quickToggleAccess(uid, active) {
-  const u = _users.find(u => u.id === uid);
+async function quickToggleAccess(email, active) {
+  const u = _users.find(u => u.email === email);
   if (!u) return;
-  u.status = active ? 'Active' : 'Suspended';
-  updateBadges();
-  renderUsers();
+  const newStatus = active ? 'Active' : 'Suspended';
+  const res = await authFetch('/api/mgmt-update-user', {
+    method: 'POST',
+    body: JSON.stringify({ email, updates: { status: newStatus } })
+  });
+  if (res && res.ok) {
+    u.status = newStatus;
+    updateBadges();
+    renderUsers();
+  }
 }
 
-function openEditUser(uid) {
-  const u = _users.find(u => u.id === uid);
+function openEditUser(email) {
+  const u = _users.find(u => u.email === email);
   if (!u) return;
-  _editUserId = uid;
-  document.getElementById('edit-user-id').value      = uid;
-  document.getElementById('edit-user-email').textContent = u.email;
-  document.getElementById('edit-user-name').value    = u.name;
-  document.getElementById('edit-user-sid').value     = u.sid;
-  document.getElementById('edit-user-room').value    = u.roomNumber || '';
-  document.getElementById('edit-user-mobile').value  = u.mobile;
-  document.getElementById('edit-user-accstatus').value = u.status;
-  document.getElementById('edit-user-pw').value      = '';
-  document.getElementById('edit-user-admin').checked = u.isAdmin;
+  _editUserEmail = email;
+  document.getElementById('edit-user-id').value           = email;
+  document.getElementById('edit-user-email').textContent  = u.email;
+  document.getElementById('edit-user-name').value         = u.name;
+  document.getElementById('edit-user-sid').value          = u.sid;
+  document.getElementById('edit-user-room').value         = u.roomNumber || '';
+  document.getElementById('edit-user-mobile').value       = u.mobile || '';
+  document.getElementById('edit-user-accstatus').value    = u.status;
+  document.getElementById('edit-user-pw').value           = '';
+  document.getElementById('edit-user-admin').checked      = u.isAdmin;
   document.getElementById('btn-suspend-user').textContent = u.status === 'Suspended' ? 'Reinstate account' : 'Suspend account';
   const s = document.getElementById('edit-user-status');
   s.className = 'modal-status'; s.textContent = '';
   openModal('modal-edit-user');
 }
 
-function saveUser() {
-  const u = _users.find(u => u.id === _editUserId);
+async function saveUser() {
+  const u = _users.find(u => u.email === _editUserEmail);
   if (!u) return;
-  u.name    = document.getElementById('edit-user-name').value.trim() || u.name;
-  u.sid     = document.getElementById('edit-user-sid').value.trim() || u.sid;
-  u.mobile  = document.getElementById('edit-user-mobile').value.trim();
-  u.roomNumber = document.getElementById('edit-user-room').value.trim();
-  u.status  = document.getElementById('edit-user-accstatus').value;
-  u.isAdmin = document.getElementById('edit-user-admin').checked;
-  const s = document.getElementById('edit-user-status');
-  s.textContent = 'Changes saved.'; s.className = 'modal-status show success';
-  updateBadges();
-  renderUsers();
+  const btn = document.getElementById('btn-save-user');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const updates = {
+    name:       document.getElementById('edit-user-name').value.trim(),
+    studentId:  document.getElementById('edit-user-sid').value.trim(),
+    roomNumber: document.getElementById('edit-user-room').value.trim(),
+    mobile:     document.getElementById('edit-user-mobile').value.trim(),
+    status:     document.getElementById('edit-user-accstatus').value,
+    isAdmin:    document.getElementById('edit-user-admin').checked,
+  };
+  const newPw = document.getElementById('edit-user-pw').value;
+  if (newPw) updates.newPassword = newPw;
+  const res = await authFetch('/api/mgmt-update-user', {
+    method: 'POST',
+    body: JSON.stringify({ email: _editUserEmail, updates })
+  });
+  btn.disabled = false; btn.textContent = 'Save changes';
+  if (!res) return;
+  if (!res.ok) {
+    const d = await res.json();
+    showStatus('edit-user-status', d.error || 'Update failed.', 'error');
+    return;
+  }
+  // Update local copy
+  u.name = updates.name || u.name;
+  u.sid  = updates.studentId || u.sid;
+  u.roomNumber = updates.roomNumber;
+  u.mobile = updates.mobile;
+  u.status = updates.status;
+  u.isAdmin = updates.isAdmin;
+  showStatus('edit-user-status', 'Changes saved.', 'success');
+  updateBadges(); renderUsers();
   setTimeout(() => closeModal('modal-edit-user'), 1200);
 }
 
-function toggleSuspend() {
-  const u = _users.find(u => u.id === _editUserId);
+async function toggleSuspend() {
+  const u = _users.find(u => u.email === _editUserEmail);
   if (!u) return;
-  u.status = u.status === 'Suspended' ? 'Active' : 'Suspended';
-  document.getElementById('edit-user-accstatus').value = u.status;
-  document.getElementById('btn-suspend-user').textContent = u.status === 'Suspended' ? 'Reinstate account' : 'Suspend account';
-  const s = document.getElementById('edit-user-status');
-  s.textContent = 'Account ' + (u.status === 'Suspended' ? 'suspended.' : 'reinstated.'); s.className = 'modal-status show ' + (u.status === 'Suspended' ? 'error' : 'success');
+  const newStatus = u.status === 'Suspended' ? 'Active' : 'Suspended';
+  const res = await authFetch('/api/mgmt-update-user', {
+    method: 'POST',
+    body: JSON.stringify({ email: _editUserEmail, updates: { status: newStatus } })
+  });
+  if (!res || !res.ok) return;
+  u.status = newStatus;
+  document.getElementById('edit-user-accstatus').value = newStatus;
+  document.getElementById('btn-suspend-user').textContent = newStatus === 'Suspended' ? 'Reinstate account' : 'Suspend account';
+  showStatus('edit-user-status', 'Account ' + (newStatus === 'Suspended' ? 'suspended.' : 'reinstated.'), newStatus === 'Suspended' ? 'error' : 'success');
   updateBadges(); renderUsers();
 }
 
-function submitAddUser() {
-  const name  = document.getElementById('add-name').value.trim();
-  const email = document.getElementById('add-email').value.trim();
-  const sid   = document.getElementById('add-sid').value.trim();
-  const room  = document.getElementById('add-room').value.trim();
-  const pw    = document.getElementById('add-pw').value;
-  const s     = document.getElementById('add-status');
-  if (!name || !email || !sid || pw.length < 8) {
-    s.textContent = 'Please fill in all required fields. Password must be at least 8 characters.';
-    s.className = 'modal-status show error'; return;
+async function submitAddUser() {
+  const name   = document.getElementById('add-name').value.trim();
+  const email  = document.getElementById('add-email').value.trim();
+  const sid    = document.getElementById('add-sid').value.trim();
+  const room   = document.getElementById('add-room').value.trim();
+  const mobile = document.getElementById('add-mobile').value.trim();
+  const isAdmin= document.getElementById('add-is-admin').checked;
+  const s      = document.getElementById('add-status');
+  if (!name || !email || !sid || !room) {
+    showStatus('add-status', 'Name, email, student ID and room number are required.', 'error'); return;
   }
-  const newUser = {
-    id: 'u' + Date.now(), name, email, sid,
-    mobile: document.getElementById('add-mobile').value.trim(),
-    status: 'New', isAdmin: document.getElementById('add-is-admin').checked, bookings: 0, roomNumber: room
-  };
-  _users.unshift(newUser);
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
+    showStatus('add-status', 'Please enter a valid email address.', 'error'); return;
+  }
+  const btn = document.getElementById('btn-submit-add');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  const res = await authFetch('/api/mgmt-create-user', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, studentId: sid, roomNumber: room, mobile, isAdmin })
+  });
+  btn.disabled = false; btn.textContent = 'Create account & send email';
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showStatus('add-status', data.error || 'Failed to create user.', 'error'); return; }
+  // Add to local list
+  _users.unshift({ id: email, email, name, sid, roomNumber: room, mobile, status: 'Active', isAdmin, bookings: 0, emailVerified: true });
   updateBadges();
-  s.textContent = 'Account created and welcome email sent to ' + email + '.';
-  s.className = 'modal-status show success';
-  document.getElementById('add-name').value = document.getElementById('add-email').value = document.getElementById('add-sid').value = document.getElementById('add-pw').value = document.getElementById('add-mobile').value = '';
+  showStatus('add-status', 'Account created and welcome email sent to ' + email + '.', 'success');
+  ['add-name','add-email','add-sid','add-room','add-pw','add-mobile'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('add-is-admin').checked = false;
   setTimeout(() => switchPanel('users'), 1500);
 }
 
 // ── Bookings ──
+async function reloadBookings() {
+  const dateF = document.getElementById('booking-date-filter').value;
+  const svcF  = document.getElementById('booking-svc-filter').value;
+  const stF   = document.getElementById('booking-status-filter').value;
+  await loadBookings(dateF || null, svcF, stF);
+  renderBookings();
+}
+
 function renderBookings() {
   const dateF = document.getElementById('booking-date-filter').value;
   const svcF  = document.getElementById('booking-svc-filter').value;
   const stF   = document.getElementById('booking-status-filter').value;
-  let bks = _bookings.filter(b => {
-    return (!dateF || b.date === dateF) &&
-           (svcF === 'all' || String(b.svc) === svcF) &&
-           (stF === 'all' || b.status === stF);
-  });
+  let bks = _bookings.filter(b =>
+    (!dateF || b.date === dateF) &&
+    (svcF === 'all' || String(b.svc) === svcF) &&
+    (stF  === 'all' || b.status === stF)
+  );
   document.getElementById('booking-count').textContent = bks.length + ' booking' + (bks.length !== 1 ? 's' : '');
   const tbody = document.getElementById('booking-tbody');
-  if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found for selected filters.</td></tr>'; return; }
+  if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found.</td></tr>'; return; }
   tbody.innerHTML = bks.map(b => `<tr>
     <td><span class="ref-code">${b.ref}</span></td>
-    <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(_users.find(u=>u.id===b.userId)?.sid||'')}</div></td>
+    <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}</div></td>
     <td>Service No.${b.svc}</td>
-    <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name}</td>
+    <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
     <td>${b.time}</td>
     <td>1</td>
     <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
     <td class="muted">${b.bookedAt}</td>
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
+}
+
+async function reloadHistory() {
+  const filt = document.getElementById('hist-filter').value;
+  await loadBookings(null, null, filt !== 'all' ? filt : null);
+  renderHistory();
 }
 
 function renderHistory() {
@@ -816,47 +954,54 @@ function openBookingDetail(ref) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">
       <div><span style="color:var(--muted);">Ref</span></div><div><strong>${b.ref}</strong></div>
       <div><span style="color:var(--muted);">Student</span></div><div>${esc(b.name)}</div>
-      <div><span style="color:var(--muted);">Student ID</span></div><div>${esc(_users.find(u=>u.id===b.userId)?.sid||'—')}</div>
+      <div><span style="color:var(--muted);">Student ID</span></div><div>${esc(b.sid||'—')}</div>
+      <div><span style="color:var(--muted);">Email</span></div><div>${esc(b.userEmail||'')}</div>
       <div><span style="color:var(--muted);">Service</span></div><div>Service No.${b.svc}</div>
-      <div><span style="color:var(--muted);">Stop</span></div><div>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name}</div>
+      <div><span style="color:var(--muted);">Stop</span></div><div>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</div>
       <div><span style="color:var(--muted);">Departure</span></div><div>${b.time}</div>
       <div><span style="color:var(--muted);">Date</span></div><div>${b.date}</div>
-      <div><span style="color:var(--muted);">Seats</span></div><div>1</div>
       <div><span style="color:var(--muted);">Status</span></div><div><span class="badge ${bkBadge(b.status)}">${b.status}</span></div>
       <div><span style="color:var(--muted);">Booked at</span></div><div>${b.bookedAt}</div>
     </div>`;
   openModal('modal-booking');
 }
 
-function cancelBooking() {
+async function cancelBooking() {
   const b = _bookings.find(b => b.ref === _editBookingRef);
   if (!b) return;
+  const btn = document.getElementById('btn-cancel-booking');
+  btn.disabled = true; btn.textContent = 'Cancelling…';
+  const res = await authFetch('/api/mgmt-cancel-booking', {
+    method: 'POST',
+    body: JSON.stringify({ ref: _editBookingRef })
+  });
+  btn.disabled = false; btn.textContent = 'Cancel booking';
+  if (!res || !res.ok) {
+    showStatus('bk-modal-status', 'Cancellation failed. Please try again.', 'error'); return;
+  }
   b.status = 'Cancelled';
   const svc = SERVICES.find(s => s.id === b.svc);
   if (svc) svc.booked = Math.max(0, svc.booked - 1);
-  const s = document.getElementById('bk-modal-status');
-  s.textContent = 'Booking cancelled. Seat returned to service.';
-  s.className = 'modal-status show error';
+  showStatus('bk-modal-status', 'Booking cancelled. Seat returned to service.', 'error');
   document.getElementById('btn-cancel-booking').style.display = 'none';
   renderBookings(); renderDashServices(); renderServicesPanel();
 }
 
 // ── Services panel ──
 function renderServicesPanel() {
-  const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
-  const totalAvail  = CAP * 9 - totalBooked;
+  const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
   document.getElementById('svc-booked-total').textContent = totalBooked;
-  document.getElementById('svc-avail-total').textContent  = totalAvail;
+  document.getElementById('svc-avail-total').textContent  = CAP*9 - totalBooked;
   const tbody = document.getElementById('svc-tbody');
   tbody.innerHTML = SERVICES.map(s => {
     const left = CAP - s.booked;
     const pct  = Math.round((s.booked / CAP) * 100);
     const st   = left === 0 ? 'Full' : left <= 3 ? 'Low' : 'Available';
     const bc   = left === 0 ? 'badge-cancelled' : left <= 3 ? 'badge-pending' : 'badge-confirmed';
-    const stops = STOPS.filter((_, i) => s.times[i] !== '*N/S').map(st => 'Stop ' + st.num).join(', ');
+    const stops = STOPS.filter((_,i) => s.times[i] !== '*N/S').map(st => 'Stop ' + st.num).join(', ');
     return `<tr>
       <td><strong>Service No.${s.id}</strong></td>
-      <td>${s.times.find(t => t !== '*N/S')}</td>
+      <td>${s.times.find(t => t !== '*N/S') || '—'}</td>
       <td class="muted" style="font-size:12px;">${stops}</td>
       <td>${CAP}</td>
       <td>${s.booked}</td>
@@ -878,8 +1023,6 @@ function renderServicesPanel() {
 function renderServices() { renderServicesPanel(); }
 
 // ── Schedule editor ──
-let _editSchedSvcId = null;
-
 function openEditSchedule(svcId) {
   const svc = SERVICES.find(s => s.id === svcId);
   if (!svc) return;
@@ -887,13 +1030,10 @@ function openEditSchedule(svcId) {
   document.getElementById('sched-modal-title').textContent = 'Edit schedule — Service No.' + svcId;
   const st = document.getElementById('sched-status');
   st.className = 'modal-status'; st.textContent = '';
-
-  // Build stop rows
   const grid = document.getElementById('sched-stops-grid');
   grid.innerHTML = STOPS.map((stop, i) => {
-    const t   = svc.times[i];
+    const t = svc.times[i];
     const isNS = t === '*N/S';
-    // Convert "7:05" → "07:05" for time input value
     const timeVal = isNS ? '' : t.replace(/^(\d):/, '0$1:');
     return `<div class="sched-stop-row" id="sched-row-${i}">
       <div class="sched-stop-num">${stop.num}</div>
@@ -901,25 +1041,13 @@ function openEditSchedule(svcId) {
         <div class="sched-stop-name">${stop.name}</div>
         <div class="sched-stop-addr">${stop.addr}</div>
       </div>
-      <input
-        type="time"
-        class="sched-time-input"
-        id="sched-time-${i}"
-        value="${timeVal}"
-        ${isNS ? 'disabled' : ''}
-      >
+      <input type="time" class="sched-time-input" id="sched-time-${i}" value="${timeVal}" ${isNS?'disabled':''}>
       <label class="sched-ns-label">
-        <input
-          type="checkbox"
-          id="sched-ns-${i}"
-          ${isNS ? 'checked' : ''}
-          onchange="toggleNS(${i})"
-        >
+        <input type="checkbox" id="sched-ns-${i}" ${isNS?'checked':''} onchange="toggleNS(${i})">
         Not serviced
       </label>
     </div>`;
   }).join('');
-
   openModal('modal-schedule');
 }
 
@@ -928,57 +1056,43 @@ function toggleNS(idx) {
   const input = document.getElementById('sched-time-' + idx);
   input.disabled = isNS;
   if (isNS) input.value = '';
-  // Visually dim the row
   document.getElementById('sched-row-' + idx).style.opacity = isNS ? '0.45' : '1';
 }
 
-function saveSchedule() {
-  const svc = SERVICES.find(s => s.id === _editSchedSvcId);
-  if (!svc) return;
-
+async function saveSchedule() {
   const newTimes = [];
-  let hasAtLeastOneStop = false;
-  let hasError = false;
-
+  let hasStop = false, hasError = false;
   STOPS.forEach((_, i) => {
     const isNS  = document.getElementById('sched-ns-' + i).checked;
     const input = document.getElementById('sched-time-' + i);
     if (isNS) {
       newTimes.push('*N/S');
     } else {
-      const val = input.value;
-      if (!val) {
-        input.style.borderColor = '#E24B4A';
-        hasError = true;
-        newTimes.push('');
+      if (!input.value) {
+        input.style.borderColor = '#E24B4A'; hasError = true; newTimes.push('');
       } else {
         input.style.borderColor = '';
-        // Normalise: strip leading zero from hour for display consistency
-        const [hh, mm] = val.split(':');
+        const [hh, mm] = input.value.split(':');
         newTimes.push(parseInt(hh) + ':' + mm);
-        hasAtLeastOneStop = true;
+        hasStop = true;
       }
     }
   });
+  if (hasError) { showStatus('sched-status', 'Please enter a time for all active stops.', 'error'); return; }
+  if (!hasStop) { showStatus('sched-status', 'At least one stop must be active.', 'error'); return; }
 
-  const st = document.getElementById('sched-status');
-
-  if (hasError) {
-    st.textContent = 'Please enter a time for all active stops, or mark them as not serviced.';
-    st.className = 'modal-status show error';
-    return;
-  }
-  if (!hasAtLeastOneStop) {
-    st.textContent = 'At least one stop must be active for this service.';
-    st.className = 'modal-status show error';
-    return;
-  }
-
-  svc.times = newTimes;
-  st.textContent = 'Schedule updated for Service No.' + _editSchedSvcId + '.';
-  st.className = 'modal-status show success';
-  renderServicesPanel();
-  renderDashServices();
+  const btn = document.querySelector('#modal-schedule .btn-gold');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const res = await authFetch('/api/mgmt-update-schedule', {
+    method: 'POST',
+    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes })
+  });
+  btn.disabled = false; btn.textContent = 'Save schedule';
+  if (!res || !res.ok) { showStatus('sched-status', 'Failed to save schedule.', 'error'); return; }
+  const svc = SERVICES.find(s => s.id === _editSchedSvcId);
+  if (svc) svc.times = newTimes;
+  showStatus('sched-status', 'Schedule updated for Service No.' + _editSchedSvcId + '.', 'success');
+  renderServicesPanel(); renderDashServices();
   setTimeout(() => closeModal('modal-schedule'), 1200);
 }
 
@@ -998,5 +1112,6 @@ document.querySelectorAll('.nav-item').forEach(el => {
 
 init();
 </script>
+
 </body>
 </html>
