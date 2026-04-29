@@ -556,6 +556,8 @@ function tryCreate() {
   goTo('verifyScreen');
 }
 
+const API_BASE = 'https://hughes-shuttle-api-b0c8grbzbheactam.australiaeast-01.azurewebsites.net';
+
 // ── OTP helpers ──
 function otpInput(el, nextId) {
   el.value = el.value.replace(/\D/g,'');
@@ -596,7 +598,7 @@ function startResend() {
   // Re-send OTP via API
   const email = window._pendingRegistration && window._pendingRegistration.email;
   if (email) {
-    fetch('/api/send-2fa-code', {
+    fetch(API_BASE + '/api/send-2fa-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -648,7 +650,7 @@ async function tryLogin() {
 
   setLoading('btnLogin', true, 'Sign in');
   try {
-    const res  = await fetch('/api/portal-login', {
+    const res  = await fetch(API_BASE + '/api/portal-login', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ email, password })
@@ -693,7 +695,7 @@ async function tryCreate() {
 
   setLoading('btnCreate', true, 'Create account');
   try {
-    const res  = await fetch('/api/create-account', {
+    const res  = await fetch(API_BASE + '/api/create-account', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ name, email, studentId: sid, roomNumber: room, password: pw })
@@ -723,7 +725,7 @@ async function verifyOtp() {
   ['o1','o2','o3','o4','o5','o6'].forEach(id => document.getElementById(id).disabled = true);
 
   try {
-    const res  = await fetch('/api/verify-2fa', {
+    const res  = await fetch(API_BASE + '/api/verify-2fa', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ email, otp })
@@ -771,7 +773,7 @@ async function loadServices() {
   if (!token) return;
 
   try {
-    const res  = await fetch(`/api/get-services?date=${date}`, {
+    const res  = await fetch(API_BASE + `/api/get-services?date=${date}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) return;
@@ -808,7 +810,7 @@ async function confirmBooking() {
   if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
 
   try {
-    const res  = await fetch('/api/confirm-booking', {
+    const res  = await fetch(API_BASE + '/api/confirm-booking', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body:    JSON.stringify({ serviceNumber: svc.id, stopNumber: stop.num, travelDate: date })
@@ -849,7 +851,7 @@ async function loadMyBookings() {
   const token = getToken();
   if (!token) return;
   try {
-    const res  = await fetch('/api/get-my-bookings', { headers: { Authorization: `Bearer ${token}` } });
+    const res  = await fetch(API_BASE + '/api/get-my-bookings', { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return;
     const data = await res.json();
     _myBookings = (data.bookings || []).map(b => ({
