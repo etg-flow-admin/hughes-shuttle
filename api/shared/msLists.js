@@ -44,8 +44,10 @@ function getListId(listName) {
 async function getListItems(listName, filter = '', select = '', top = 500) {
   const token  = await getGraphToken();
   const listId = getListId(listName);
+  // Graph API requires fields/ prefix on field filters when using $expand=fields
+  const graphFilter = filter ? filter.replace(/(\w+)\s+(eq|ne|lt|gt|le|ge|startswith)/gi, 'fields/$1 $2') : '';
   let url = `${GRAPH_BASE}/${listId}/items?$expand=fields&$top=${top}`;
-  if (filter) url += `&$filter=${encodeURIComponent(filter)}`;
+  if (graphFilter) url += `&$filter=${encodeURIComponent(graphFilter)}`;
   const res  = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
   });
