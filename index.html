@@ -411,6 +411,7 @@
               <input class="inp" type="text" placeholder="e.g. wheelchair accessible (optional)">
             </div>
           </div>
+          <div id="bookingError" style="display:none;background:#FCEBEB;border:0.5px solid #F09595;border-radius:7px;padding:11px 13px;font-size:13px;color:#A32D2D;margin-bottom:0.75rem;"></div>
           <button class="btn-gold" style="margin-top:0.25rem;" onclick="confirmBooking()">Confirm booking</button>
           <button class="btn-ghost" onclick="cancelBooking()">Cancel</button>
         </div>
@@ -588,6 +589,8 @@ function cancelBooking() {
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   const btn = document.querySelector('#bookingForm .btn-gold');
   if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+  const errEl = document.getElementById('bookingError');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
 }
 
 function switchTab(t) {
@@ -1025,7 +1028,8 @@ async function confirmBooking() {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data.error || 'Booking failed. Please try again.');
+      const errEl = document.getElementById('bookingError');
+      if (errEl) { errEl.textContent = data.error || 'Booking failed. Please try again.'; errEl.style.display = 'block'; }
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
       return;
     }
@@ -1043,7 +1047,8 @@ async function confirmBooking() {
     renderServices();
     switchTab('my');
   } catch (err) {
-    alert('Unable to connect. Please try again.');
+    const errEl = document.getElementById('bookingError');
+    if (errEl) { errEl.textContent = 'Unable to connect. Please try again.'; errEl.style.display = 'block'; }
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
   }
 }
