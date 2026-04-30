@@ -122,6 +122,15 @@
   .my-booking-card { background: var(--h-white); border: 0.5px solid var(--h-border-sub); border-radius: 9px; padding: 1rem 1.1rem; margin-bottom: 10px; }
   .booking-ref { font-size: 11px; color: var(--h-muted); margin-top: 9px; padding-top: 9px; border-top: 0.5px solid var(--h-border-sub); }
   .booking-ref span { font-weight: 600; color: var(--h-navy); letter-spacing: 0.05em; }
+  .cancel-confirm { display:none; background:#FCEBEB; border:0.5px solid #F09595; border-radius:8px; padding:12px 14px; margin-top:10px; }
+  .cancel-confirm.show { display:block; }
+  .cancel-confirm p { font-size:13px; color:#A32D2D; margin:0 0 10px; font-weight:600; }
+  .cancel-confirm-btns { display:flex; gap:8px; }
+  .btn-cancel-confirm { padding:8px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; border:none; }
+  .btn-cancel-yes { background:#A32D2D; color:#fff; }
+  .btn-cancel-yes:hover { background:#8a2424; }
+  .btn-cancel-no { background:var(--h-border-sub); color:var(--h-navy); }
+  .btn-cancel-no:hover { background:#d1d5db; }
 
 
   .hdr-divider { width: 1px; height: 28px; background: rgba(201,168,76,0.35); margin: 0 4px; flex-shrink: 0; }
@@ -1096,15 +1105,35 @@ function renderMyBookings() {
       </div>
       <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
         <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
-        ${!b.cancelled ? `<button onclick="cancelMyBooking('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
+        ${!b.cancelled ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
       </div>
+      ${!b.cancelled ? `
+      <div class="cancel-confirm" id="cancel-confirm-${b.ref}">
+        <p>Cancel this booking? Your seat will be released.</p>
+        <div class="cancel-confirm-btns">
+          <button class="btn-cancel-confirm btn-cancel-yes" onclick="cancelMyBooking('${b.ref}')">Yes, cancel</button>
+          <button class="btn-cancel-confirm btn-cancel-no" onclick="hideCancelConfirm('${b.ref}')">Keep booking</button>
+        </div>
+      </div>` : ''}
     </div>`).join('');
 }
 
+function showCancelConfirm(ref) {
+  // Hide any other open confirms first
+  document.querySelectorAll('.cancel-confirm.show').forEach(el => el.classList.remove('show'));
+  const el = document.getElementById('cancel-confirm-' + ref);
+  if (el) el.classList.add('show');
+}
+function hideCancelConfirm(ref) {
+  const el = document.getElementById('cancel-confirm-' + ref);
+  if (el) el.classList.remove('show');
+}
+
 async function cancelMyBooking(ref) {
-  if (!confirm('Cancel this booking? Your seat will be released.')) return;
   const token = getToken();
   if (!token) return;
+  const btn = document.querySelector(`#cancel-confirm-${ref} .btn-cancel-yes`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
   try {
     const res  = await fetch(API_BASE + '/api/cancel-booking', {
       method:  'POST',
@@ -1112,14 +1141,18 @@ async function cancelMyBooking(ref) {
       body:    JSON.stringify({ ref })
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Cancellation failed.'); return; }
+    if (!res.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel'; }
+      const errEl = document.getElementById('cancel-confirm-' + ref);
+      if (errEl) { const p = errEl.querySelector('p'); if (p) p.textContent = data.error || 'Cancellation failed.'; }
+      return;
+    }
     const b = _myBookings.find(b => b.ref === ref);
     if (b) b.cancelled = true;
     renderMyBookings();
-    // Refresh seat counts on booking tab
     loadServices();
   } catch (err) {
-    alert('Unable to connect. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Yes, cancel'; }
   }
 }
 
@@ -1144,7 +1177,12 @@ document.getElementById('dateInput').addEventListener('change', () => {
 })();
 
 // ── Init ──
-document.getElementById('dateInput').valueAsDate = new Date();
+// Set date to today in local timezone
+const _localToday = new Date();
+const _localTodayStr = _localToday.getFullYear() + '-' +
+  String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
+  String(_localToday.getDate()).padStart(2, '0');
+document.getElementById('dateInput').value = _localTodayStr;
 renderServices();
 </script>
 </body>
