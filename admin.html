@@ -684,6 +684,9 @@ function updateBadges() {
   const confirmed = todayBks.filter(b => b.status !== 'Cancelled').length;
   const cancelled = todayBks.filter(b => b.status === 'Cancelled').length;
   const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
+  // Also count from bookings list as a cross-check
+  const seatsFromBookings = _bookings.filter(b => b.date === todayStr && b.status !== 'Cancelled').length;
+  const seatsDisplay = Math.max(totalBooked, seatsFromBookings);
 
   // Nav badges
   document.getElementById('badge-users').textContent    = _users.length;
@@ -693,7 +696,7 @@ function updateBadges() {
   document.getElementById('ds-total').textContent     = _users.length;
   document.getElementById('ds-active').textContent    = _users.filter(u => u.status === 'Active').length;
   document.getElementById('ds-today').textContent     = confirmed;
-  document.getElementById('ds-seats').textContent     = totalBooked + ' / ' + (CAP * 9);
+  document.getElementById('ds-seats').textContent     = seatsDisplay + ' / ' + (CAP * 9);
   document.getElementById('ds-cancelled').textContent = cancelled;
 
   // Users panel stats
