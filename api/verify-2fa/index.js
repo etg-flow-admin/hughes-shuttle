@@ -20,13 +20,13 @@ module.exports = wrapHandler('verify-2fa', async function (context, req) {
     }
     const valid = await bcrypt.compare(otp.trim(), user.OTPCode || '');
     if (!valid) { context.res = { status: 400, body: { error: 'Invalid code. Please check and try again.' } }; return; }
-    await updateListItem('ShuttleUsers', user.ID, {
-      EmailVerified: true,
-      Status:        user.Status === 'New' ? 'Active' : (user.Status || 'Active'),
-      OTPCode:       '',
-      OTPExpiry:     '',
-      LastLoginAt:   new Date().toISOString(),
-    });
+await updateListItem('ShuttleUsers', user.ID, {
+  EmailVerified: true,
+  Status: user.Status === 'New' ? 'Active' : (user.Status || 'Active'),
+  OTPCode: null,
+  OTPExpiry: null,
+  LastLoginAt: new Date().toISOString(),
+});
     const secret = await getSecret('jwt-secret');
     const token  = jwt.sign(
       { email, name: user.Name, studentId: user.StudentID, isAdmin: user.IsAdmin === true },
