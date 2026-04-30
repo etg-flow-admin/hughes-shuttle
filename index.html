@@ -607,8 +607,13 @@ function switchTab(t) {
   if (t === 'book') {
     const btn = document.querySelector('#bookingForm .btn-gold');
     if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+    // Re-render with existing counts — do NOT reload from API to avoid flash
+    renderServices();
   }
   document.getElementById('panelMy').style.display   = t === 'my'   ? 'block' : 'none';
+  document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
+  document.getElementById('tabMy').className   = 'tab' + (t === 'my'  ? ' active' : '');
+}
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
   document.getElementById('tabMy').className   = 'tab' + (t === 'my'  ? ' active' : '');
 }
@@ -1183,7 +1188,10 @@ const _localTodayStr = _localToday.getFullYear() + '-' +
   String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
   String(_localToday.getDate()).padStart(2, '0');
 document.getElementById('dateInput').value = _localTodayStr;
-renderServices();
+
+// Only render after live data loads — avoid flash of 22/22 prototype counts
+if (!getToken()) renderServices();
+// If logged in, session restore block below will call loadServices() which calls renderServices()
 </script>
 </body>
 </html>
