@@ -1,9 +1,9 @@
 // POST /api/send-2fa-code
-// { email } → { sent: true }  — resend OTP for email verification
+// { email } → { sent: true }  — resend OTP for email verification or password reset
 const bcrypt = require('bcrypt');
 const { wrapHandler }    = require('../shared/logger');
 const { getListItem, updateListItem } = require('../shared/msLists');
-const { sendEmail, otpTemplate }      = require('../shared/email');
+const { sendEmail, otpTemplate, passwordResetTemplate } = require('../shared/email');
 
 module.exports = wrapHandler('send-2fa-code', async function (context, req) {
   const email = ((req.body && req.body.email) || '').toLowerCase().trim();
@@ -15,7 +15,11 @@ module.exports = wrapHandler('send-2fa-code', async function (context, req) {
     const hash   = await bcrypt.hash(otp, 8);
     const expiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     await updateListItem('ShuttleUsers', user.ID, { OTPCode: hash, OTPExpiry: expiry });
-    await sendEmail(email, 'Your Hughes Shuttle verification code', otpTemplate(user.Name, otp));
+    // Use password reset template for verified users, OTP template for new account verification
+    const isVerified = user.EmailVerified === true || user.EmailVerified === 'Yes' || user.EmailVerified === 1;
+    const subject = isVerified ? 'Reset your Hughes Shuttle Bus password' : 'Your Hughes Shuttle verification code';
+    const html    = isVerified ? passwordResetTemplate(user.Name, otp) : otpTemplate(user.Name, otp);
+    await sendEmail(email, subject, html);
     context.log.info('send-2fa-code: sent to ' + email);
     context.res = { status: 200, body: { sent: true } };
   } catch (err) {
