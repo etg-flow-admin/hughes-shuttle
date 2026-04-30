@@ -324,7 +324,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
             <th onclick="sortUsers('lastLoginAt')">Last login <span class="sort-arrow">↕</span></th>
-            <th>Access</th>
             <th></th>
           </tr></thead>
           <tbody id="user-tbody"></tbody>
@@ -825,7 +824,7 @@ function renderUsers() {
   });
   document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
   const tbody = document.getElementById('user-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
   tbody.innerHTML = users.map(u => `<tr>
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
@@ -835,12 +834,6 @@ function renderUsers() {
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
     <td class="muted">${u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : '—'}</td>
-    <td>
-      <label class="toggle" title="${u.status === 'Active' ? 'Active' : 'Suspended'}">
-        <input type="checkbox" ${u.status==='Active'?'checked':''} onchange="quickToggleAccess('${esc(u.email)}', this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </td>
     <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button></td>
   </tr>`).join('');
 }
