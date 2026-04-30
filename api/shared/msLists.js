@@ -1,5 +1,5 @@
 // api/shared/msLists.js
-// Microsoft Graph API — uses list IDs from app settings (same pattern as Fit4Me)
+// Microsoft Graph API — uses list IDs from app settings
 
 const fetch = require('node-fetch');
 
@@ -14,6 +14,13 @@ const LIST_IDS = {
 };
 
 const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
+
+// Explicit field selects for each list — required to retrieve hidden fields
+const LIST_FIELDS = {
+  ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt',
+  ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
+  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time',
+};
 
 let _tokenCache = { token: null, expiry: 0 };
 
@@ -42,11 +49,12 @@ function getListId(listName) {
 }
 
 async function getListItems(listName, filter = '', select = '', top = 500) {
-  const token  = await getGraphToken();
-  const listId = getListId(listName);
-  // Graph API requires fields/ prefix on field filters when using $expand=fields
+  const token    = await getGraphToken();
+  const listId   = getListId(listName);
+  const fields   = select || LIST_FIELDS[listName] || '';
+  const expand   = fields ? `fields($select=${fields})` : 'fields';
   const graphFilter = filter ? filter.replace(/(\w+)\s+(eq|ne|lt|gt|le|ge|startswith)/gi, 'fields/$1 $2') : '';
-  let url = `${GRAPH_BASE}/${listId}/items?$expand=fields&$top=${top}`;
+  let url = `${GRAPH_BASE}/${listId}/items?$expand=${expand}&$top=${top}`;
   if (graphFilter) url += `&$filter=${encodeURIComponent(graphFilter)}`;
   const res  = await fetch(url, {
     headers: {
