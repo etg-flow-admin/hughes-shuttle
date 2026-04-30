@@ -379,8 +379,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="panel" id="panel-bookings">
       <div class="page-header">
         <div><div class="page-title">All bookings</div><div class="page-sub">Current and upcoming shuttle bookings</div></div>
-        <div class="header-actions">
-          <input type="date" class="filter-select" id="booking-date-filter" onchange="reloadBookings()">
+        <div class="header-actions" style="flex-wrap:wrap;gap:8px;align-items:center;">
+          <input type="date" class="filter-select" id="booking-date-filter" onchange="reloadBookings()" style="min-width:130px;">
           <select class="filter-select" id="booking-svc-filter" onchange="reloadBookings()">
             <option value="all">All services</option>
             <option value="1">Service 1</option><option value="2">Service 2</option>
@@ -507,6 +507,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-gold" id="btn-save-user" onclick="saveUser()">Save changes</button>
       <button class="btn btn-danger" id="btn-suspend-user" onclick="toggleSuspend()">Suspend account</button>
+      <button class="btn btn-outline" onclick="sendPasswordReset()">&#128274; Send password reset</button>
+      <button class="btn btn-danger" onclick="deleteUser()" style="margin-left:auto;">&#128465; Delete user</button>
       <button class="btn btn-outline" onclick="closeModal('modal-edit-user')">Cancel</button>
     </div>
   </div>
@@ -893,6 +895,36 @@ async function toggleSuspend() {
   document.getElementById('edit-user-accstatus').value = newStatus;
   document.getElementById('btn-suspend-user').textContent = newStatus === 'Suspended' ? 'Reinstate account' : 'Suspend account';
   showStatus('edit-user-status', 'Account ' + (newStatus === 'Suspended' ? 'suspended.' : 'reinstated.'), newStatus === 'Suspended' ? 'error' : 'success');
+  updateBadges(); renderUsers();
+}
+
+async function sendPasswordReset() {
+  const email = _editUserEmail;
+  if (!email) return;
+  const btn = document.querySelector('#modal-edit-user .btn-outline');
+  showStatus('edit-user-status', 'Sending reset email…', 'success');
+  const res = await authFetch('/api/send-2fa-code', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+  if (res && res.ok) {
+    showStatus('edit-user-status', 'Password reset email sent to ' + email + '.', 'success');
+  } else {
+    showStatus('edit-user-status', 'Failed to send reset email.', 'error');
+  }
+}
+
+async function deleteUser() {
+  const u = _users.find(u => u.email === _editUserEmail);
+  if (!u) return;
+  if (!confirm('Permanently delete ' + u.name + '? This cannot be undone.')) return;
+  const res = await authFetch('/api/mgmt-update-user', {
+    method: 'POST',
+    body: JSON.stringify({ email: _editUserEmail, updates: { status: 'Deleted' } })
+  });
+  if (!res || !res.ok) { showStatus('edit-user-status', 'Delete failed.', 'error'); return; }
+  _users = _users.filter(u => u.email !== _editUserEmail);
+  closeModal('modal-edit-user');
   updateBadges(); renderUsers();
 }
 
