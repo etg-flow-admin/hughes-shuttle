@@ -1,9 +1,6 @@
 {
   "routes": [
     {
-      "route": "/api/*"
-    },
-    {
       "route": "/*.html",
       "headers": {
         "cache-control": "no-cache, no-store, must-revalidate"
