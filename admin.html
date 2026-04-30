@@ -927,18 +927,18 @@ async function toggleSuspend() {
 }
 
 async function sendPasswordReset() {
-  const email = _editUserEmail;
-  if (!email) return;
-  const btn = document.querySelector('#modal-edit-user .btn-outline');
-  showStatus('edit-user-status', 'Sending reset email…', 'success');
-  const res = await authFetch('/api/send-2fa-code', {
+  const u = _users.find(u => u.email === _editUserEmail);
+  if (!u) return;
+  if (!confirm('Generate a new temporary password and email it to ' + _editUserEmail + '?')) return;
+  showStatus('edit-user-status', 'Resetting password…', 'success');
+  const res = await authFetch('/api/mgmt-reset-password', {
     method: 'POST',
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email: _editUserEmail })
   });
   if (res && res.ok) {
-    showStatus('edit-user-status', 'Password reset email sent to ' + email + '.', 'success');
+    showStatus('edit-user-status', 'New temporary password emailed to ' + _editUserEmail + '.', 'success');
   } else {
-    showStatus('edit-user-status', 'Failed to send reset email.', 'error');
+    showStatus('edit-user-status', 'Failed to reset password.', 'error');
   }
 }
 
