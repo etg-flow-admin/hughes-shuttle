@@ -165,9 +165,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="panel" id="panel-users">
       <div class="page-header">
         <div><div class="page-title">User management</div><div class="page-sub">View, edit and control student access</div></div>
-        <div class="header-actions"><button class="btn btn-gold btn-sm" onclick="openModal('modal-add-user')" id="btn-add-user">+ Add new user</button><button class="btn btn-outline btn-sm" onclick="exportUsersCSV()">&#8595; Export CSV</button></div>
         <div class="header-actions">
           <button class="btn btn-gold btn-sm" onclick="switchPanel('adduser')">+ Add new user</button>
+          <button class="btn btn-outline btn-sm" onclick="exportUsersCSV()">&#8595; Export CSV</button>
         </div>
       </div>
       <div class="stats-row">
@@ -293,6 +293,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="page-header">
         <div><div class="page-title">Booking history</div><div class="page-sub">Historical record of all shuttle bookings</div></div>
         <div class="header-actions" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">&#8595; Export CSV</button>
           <input class="filter-select" type="text" id="hist-search" placeholder="Search name or student ID..." oninput="renderHistory()" style="min-width:200px;">
           <select class="filter-select" id="hist-filter" onchange="reloadHistory()">
             <option value="all">All bookings</option>
