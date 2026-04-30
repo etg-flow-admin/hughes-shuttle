@@ -929,31 +929,54 @@ async function toggleSuspend() {
 async function sendPasswordReset() {
   const u = _users.find(u => u.email === _editUserEmail);
   if (!u) return;
-  if (!confirm('Generate a new temporary password and email it to ' + _editUserEmail + '?')) return;
-  showStatus('edit-user-status', 'Resetting password…', 'success');
-  const res = await authFetch('/api/mgmt-reset-password', {
-    method: 'POST',
-    body: JSON.stringify({ email: _editUserEmail })
-  });
-  if (res && res.ok) {
-    showStatus('edit-user-status', 'New temporary password emailed to ' + _editUserEmail + '.', 'success');
-  } else {
-    showStatus('edit-user-status', 'Failed to reset password.', 'error');
-  }
+  showConfirm(
+    'Reset password',
+    'Generate a new temporary password and email it to <strong>' + esc(_editUserEmail) + '</strong>?',
+    'Send new password',
+    async () => {
+      showStatus('edit-user-status', 'Resetting password…', 'success');
+      const res = await authFetch('/api/mgmt-reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: _editUserEmail })
+      });
+      if (res && res.ok) {
+        showStatus('edit-user-status', 'New temporary password emailed to ' + _editUserEmail + '.', 'success');
+      } else {
+        showStatus('edit-user-status', 'Failed to reset password.', 'error');
+      }
+    }
+  );
 }
 
 async function deleteUser() {
   const u = _users.find(u => u.email === _editUserEmail);
   if (!u) return;
-  if (!confirm('Permanently delete ' + u.name + '? This cannot be undone.')) return;
-  const res = await authFetch('/api/mgmt-update-user', {
-    method: 'POST',
-    body: JSON.stringify({ email: _editUserEmail, updates: { status: 'Deleted' } })
-  });
-  if (!res || !res.ok) { showStatus('edit-user-status', 'Delete failed.', 'error'); return; }
-  _users = _users.filter(u => u.email !== _editUserEmail);
-  closeModal('modal-edit-user');
-  updateBadges(); renderUsers();
+  showConfirm(
+    'Delete user',
+    'Permanently delete <strong>' + esc(u.name) + '</strong>? This cannot be undone.',
+    'Delete',
+    async () => {
+      const res = await authFetch('/api/mgmt-update-user', {
+        method: 'POST',
+        body: JSON.stringify({ email: _editUserEmail, updates: { status: 'Deleted' } })
+      });
+      if (!res || !res.ok) { showStatus('edit-user-status', 'Delete failed.', 'error'); return; }
+      _users = _users.filter(u => u.email !== _editUserEmail);
+      closeModal('modal-edit-user');
+      updateBadges(); renderUsers();
+    },
+    true
+  );
+}
+
+function showConfirm(title, message, confirmLabel, onConfirm, danger = false) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').innerHTML = message;
+  const btn = document.getElementById('confirm-ok');
+  btn.textContent = confirmLabel;
+  btn.className = 'btn ' + (danger ? 'btn-danger' : 'btn-gold');
+  btn.onclick = () => { closeModal('modal-confirm'); onConfirm(); };
+  openModal('modal-confirm');
 }
 
 async function submitAddUser() {
@@ -1297,6 +1320,18 @@ function exportUsersCSV() {
 setAdminAvatar();
 init();
 </script>
+
+<!-- ════ CONFIRM MODAL ════ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" id="confirm-title"></div>
+    <p id="confirm-message" style="font-size:14px;color:var(--muted);margin:10px 0 1.5rem;line-height:1.5;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm')">Cancel</button>
+      <button class="btn btn-gold" id="confirm-ok"></button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
