@@ -254,30 +254,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <!-- ── Main ── -->
   <main class="main">
 
-    <div id="panel-dashboard" class="panel active">
-  <h2>Dashboard</h2>
-</div>
-
-<div id="panel-users" class="panel">
-  <h2>User Management</h2>
-</div>
-
-<div id="panel-adduser" class="panel">
-  <h2>Add User</h2>
-</div>
-
-<div id="panel-bookings" class="panel">
-  <h2>Bookings</h2>
-</div>
-
-<div id="panel-history" class="panel">
-  <h2>Booking History</h2>
-</div>
-
-<div id="panel-services" class="panel">
-  <h2>Services</h2>
-</div>
-
     <!-- ════ DASHBOARD ════ -->
     <div class="panel active" id="panel-dashboard">
       <div style="text-align:center;margin-bottom:1rem;">
@@ -767,26 +743,27 @@ function computeUserStats() {
 
 // ── Panel switching ──
 function switchPanel(e, key) {
+  // hide all panels
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+  // remove nav highlight
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-  const panel = document.getElementById('panel-' + key);
+  // TRY BOTH naming styles (this makes it bulletproof)
+  let panel =
+    document.getElementById('panel-' + key) ||
+    document.getElementById(key);
 
   if (!panel) {
-    console.error('Panel not found:', key);
-    return;
+    console.error('Panel not found for key:', key);
+    return; // prevents blank screen crash
   }
 
   panel.classList.add('active');
 
-  if (e && e.currentTarget) {
+  if (e?.currentTarget) {
     e.currentTarget.classList.add('active');
   }
-
-  if (key === 'users')    renderUsers();
-  if (key === 'bookings') reloadBookings();
-  if (key === 'history')  reloadHistory();
-  if (key === 'services') loadServices().then(() => renderServicesPanel());
 }
 
 // ── Dashboard services ──
