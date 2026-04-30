@@ -220,6 +220,29 @@
     </div>
     </div>
   </div>
+  <div class="auth-wrap">
+    <div class="auth-inner">
+      <h2>Verify your email</h2>
+      <p class="sub">We sent a 6-digit code to <strong id="verifyEmail" style="color:var(--h-navy);"></strong>. Enter it below to activate your account.</p>
+      <div class="otp-row">
+        <input class="otp-box" id="o1" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o2')" onkeydown="otpBack(event,this,null)">
+        <input class="otp-box" id="o2" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o3')" onkeydown="otpBack(event,this,'o1')">
+        <input class="otp-box" id="o3" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o4')" onkeydown="otpBack(event,this,'o2')">
+        <input class="otp-box" id="o4" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o5')" onkeydown="otpBack(event,this,'o3')">
+        <input class="otp-box" id="o5" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,'o6')" onkeydown="otpBack(event,this,'o4')">
+        <input class="otp-box" id="o6" maxlength="1" type="text" inputmode="numeric" oninput="otpInput(this,null)" onkeydown="otpBack(event,this,'o5')">
+      </div>
+      <p style="font-size:12px;color:var(--h-muted);text-align:center;background:var(--h-gold-pale);border-radius:6px;padding:8px 12px;margin-bottom:1rem;">
+        &#128231; Can't find the email? Check your <strong>junk or spam folder</strong>.
+      </p>
+      <button class="btn-gold" onclick="verifyAndActivate()">Verify &amp; activate</button>
+      <div class="resend-row">
+        Didn't get a code?
+        <span class="resend-link" id="resendBtn" onclick="startResend()">Resend code</span>
+        <span id="resendTimer" style="display:none;">Resend in <span id="timerCount">30</span>s</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════ BOOKING PORTAL ═══════════════ -->
