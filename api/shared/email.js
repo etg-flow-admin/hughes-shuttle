@@ -154,12 +154,13 @@ function welcomeTemplate(name, email, tempPassword) {
 
 // ── Booking confirmation email ──
 function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travelDate) {
+  const dateFormatted = travelDate.split('-').reverse().join('/');
   const rows = [
     ['Reference',   `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
     ['Service',     `Service No.${serviceNum}`],
     ['Boarding at', stopName],
     ['Departure',   depTime],
-    ['Date',        travelDate],
+    ['Date',        dateFormatted],
   ];
   const tableRows = rows.map(([label, value], i) => `
     <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#F8F6F1'};">
