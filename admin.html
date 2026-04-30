@@ -132,7 +132,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle-slider { position: absolute; inset: 0; background: var(--border-sub); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
 .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
-.toggle input:checked + .toggle-slider { background: var(--gold); }
+.toggle input:checked + .toggle-slider { background: var(--success); }
+.toggle input:not(:checked) + .toggle-slider { background: var(--danger); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
 
 /* ── Modal ── */
@@ -320,6 +321,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <th onclick="sortUsers('status')">Status <span class="sort-arrow">↕</span></th>
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
+            <th onclick="sortUsers('lastLoginAt')">Last login <span class="sort-arrow">↕</span></th>
             <th>Access</th>
             <th></th>
           </tr></thead>
@@ -605,6 +607,18 @@ async function authFetch(url, opts = {}) {
 }
 
 // ── Helpers ──
+function formatLastLogin(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const dd  = String(d.getDate()).padStart(2,'0');
+  const mm  = String(d.getMonth()+1).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  const h12 = d.getHours() % 12 || 12;
+  const min = String(d.getMinutes()).padStart(2,'0');
+  const ampm = d.getHours() < 12 ? 'am' : 'pm';
+  return `${dd}/${mm}/${yyyy} ${String(h12).padStart(2,'0')}:${min} ${ampm}`;
+}
 function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function badgeCls(st) { return st==='Active'?'badge-active':st==='Suspended'?'badge-suspended':st==='New'?'badge-new':'badge-inactive'; }
 function bkBadge(st)  { return st==='Confirmed'?'badge-confirmed':st==='Cancelled'?'badge-cancelled':'badge-pending'; }
@@ -792,7 +806,7 @@ function renderUsers() {
   });
   document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
   const tbody = document.getElementById('user-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
   tbody.innerHTML = users.map(u => `<tr>
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
@@ -801,6 +815,7 @@ function renderUsers() {
     <td><span class="badge ${badgeCls(u.status)}">${u.status}</span></td>
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
+    <td class="muted">${u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : '—'}</td>
     <td>
       <label class="toggle" title="${u.status === 'Active' ? 'Active' : 'Suspended'}">
         <input type="checkbox" ${u.status==='Active'?'checked':''} onchange="quickToggleAccess('${esc(u.email)}', this.checked)">
