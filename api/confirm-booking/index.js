@@ -57,12 +57,21 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
     }
 
     // Create booking record in Microsoft Lists
-    const ref = 'SHT-' + Math.floor(1000 + Math.random() * 9000);
+    const ref  = 'SHT-' + Math.floor(1000 + Math.random() * 9000);
+
+    // Look up room number from ShuttleUsers
+    let roomNumber = '';
+    try {
+      const userRecord = await getListItem('ShuttleUsers', `Title eq '${email}'`);
+      roomNumber = userRecord?.RoomNumber || '';
+    } catch (e) { /* non-fatal */ }
+
     await createListItem('ShuttleBookings', {
       Title:         ref,
       UserEmail:     email,
       StudentID:     studentId,
       Name:          name,
+      RoomNumber:    roomNumber,
       ServiceNumber: serviceNumber,
       StopNumber:    stopNumber,
       DepartureTime: depTime,

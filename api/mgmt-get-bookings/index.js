@@ -14,7 +14,7 @@ module.exports = wrapHandler('mgmt-get-bookings', async function (context, req) 
     if (status)        filters.push(`Status eq '${status}'`);
     const items = await getListItems(
       'ShuttleBookings', filters.join(' and '),
-      'ID,Title,UserEmail,Name,StudentID,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
+      'ID,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
       5000
     );
     const bookings = items
@@ -25,6 +25,7 @@ module.exports = wrapHandler('mgmt-get-bookings', async function (context, req) 
         userEmail:     b.UserEmail,
         name:          b.Name,
         studentId:     b.StudentID,
+        roomNumber:    b.RoomNumber || '',
         serviceNumber: b.ServiceNumber,
         stopNumber:    b.StopNumber,
         departureTime: b.DepartureTime,

@@ -662,6 +662,7 @@ async function loadBookings(date, svcFilter, statusFilter) {
     userEmail: b.userEmail,
     name:      b.name,
     sid:       b.studentId,
+    roomNumber: b.roomNumber || '',
     svc:       b.serviceNumber,
     stopNum:   b.stopNumber,
     time:      b.departureTime,
@@ -931,7 +932,7 @@ function renderBookings() {
   if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found.</td></tr>'; return; }
   tbody.innerHTML = bks.map(b => `<tr>
     <td><span class="ref-code">${b.ref}</span></td>
-    <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}</div></td>
+    <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
     <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
     <td>${b.time}</td>
@@ -977,6 +978,7 @@ function openBookingDetail(ref) {
       <div><span style="color:var(--muted);">Ref</span></div><div><strong>${b.ref}</strong></div>
       <div><span style="color:var(--muted);">Student</span></div><div>${esc(b.name)}</div>
       <div><span style="color:var(--muted);">Student ID</span></div><div>${esc(b.sid||'—')}</div>
+      <div><span style="color:var(--muted);">Room</span></div><div>${esc(b.roomNumber||'—')}</div>
       <div><span style="color:var(--muted);">Email</span></div><div>${esc(b.userEmail||'')}</div>
       <div><span style="color:var(--muted);">Service</span></div><div>Service No.${b.svc}</div>
       <div><span style="color:var(--muted);">Stop</span></div><div>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</div>
