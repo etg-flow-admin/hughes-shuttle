@@ -275,6 +275,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <option value="Pending">Pending</option>
           </select>
           <span class="record-count" id="booking-count"></span>
+          <button class="btn btn-outline btn-sm" onclick="exportBookingsCSV()">&#8595; Export CSV</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -1078,6 +1079,25 @@ function exportCSV(filename, headers, rows) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportBookingsCSV() {
+  const dateF = document.getElementById('booking-date-filter').value;
+  const svcF  = document.getElementById('booking-svc-filter').value;
+  const stF   = document.getElementById('booking-status-filter').value;
+  let bks = _bookings.filter(b =>
+    (!dateF || b.date === dateF) &&
+    (svcF === 'all' || String(b.svc) === svcF) &&
+    (stF  === 'all' || b.status === stF)
+  );
+  const headers = ['Reference','Name','Student ID','Room','Email','Service','Stop','Stop Name','Departure','Date','Seats','Status','Booked At'];
+  const rows = bks.map(b => [
+    b.ref, b.name, b.sid||'', b.roomNumber||'', b.userEmail||'',
+    'Service No.'+b.svc, 'Stop '+b.stopNum, STOPS[b.stopNum-1]?.name||'',
+    b.time||'', b.date||'', 1, b.status, b.bookedAt||''
+  ]);
+  const label = dateF ? dateF : 'all-dates';
+  exportCSV('bookings-' + label + '-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
 function exportHistoryCSV() {
