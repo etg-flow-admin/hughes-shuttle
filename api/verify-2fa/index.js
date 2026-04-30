@@ -22,9 +22,9 @@ module.exports = wrapHandler('verify-2fa', async function (context, req) {
     if (!valid) { context.res = { status: 400, body: { error: 'Invalid code. Please check and try again.' } }; return; }
     await updateListItem('ShuttleUsers', user.ID, {
       EmailVerified: true,
-      Status:        user.Status === 'New' ? 'Active' : user.Status,
+      Status:        user.Status === 'New' ? 'Active' : (user.Status || 'Active'),
       OTPCode:       '',
-      OTPExpiry:     null,
+      OTPExpiry:     '',
       LastLoginAt:   new Date().toISOString(),
     });
     const secret = await getSecret('jwt-secret');

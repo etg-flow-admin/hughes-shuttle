@@ -993,6 +993,12 @@ async function loadServices() {
   const token = getToken();
   if (!token) return;
 
+  // Show loading placeholder while fetching
+  const grid = document.getElementById('serviceGrid');
+  if (grid && !grid.children.length) {
+    grid.innerHTML = '<p style="color:var(--h-muted);font-size:13px;padding:1rem 0;">Loading services…</p>';
+  }
+
   try {
     const res  = await fetch(API_BASE + `/api/get-services?date=${date}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -1162,6 +1168,13 @@ document.getElementById('dateInput').addEventListener('change', () => {
   if (getToken()) loadServices(); else renderServices();
 });
 
+// ── Init — set date FIRST before anything else ──
+const _localToday   = new Date();
+const _localTodayStr = _localToday.getFullYear() + '-' +
+  String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
+  String(_localToday.getDate()).padStart(2, '0');
+document.getElementById('dateInput').value = _localTodayStr;
+
 // ══ CHECK EXISTING SESSION ON LOAD ══
 (function() {
   const token = getToken();
@@ -1174,20 +1187,11 @@ document.getElementById('dateInput').addEventListener('change', () => {
     goTo('bookingScreen');
     loadServices();
     loadMyBookings();
+  } else {
+    renderServices();
   }
 })();
 
-// ── Init ──
-// Set date to today in local timezone
-const _localToday = new Date();
-const _localTodayStr = _localToday.getFullYear() + '-' +
-  String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
-  String(_localToday.getDate()).padStart(2, '0');
-document.getElementById('dateInput').value = _localTodayStr;
-
-// Only render after live data loads — avoid flash of 22/22 prototype counts
-if (!getToken()) renderServices();
-// If logged in, session restore block below will call loadServices() which calls renderServices()
 </script>
 </body>
 </html>

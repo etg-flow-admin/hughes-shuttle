@@ -20,7 +20,14 @@ module.exports = wrapHandler('portal-login', async function (context, req) {
 
     // Graph API may return field names with different casing — handle both
     const passwordHash  = user?.PasswordHash  || user?.passwordHash  || null;
-    const emailVerified = user?.EmailVerified  ?? user?.emailVerified ?? false;
+    // EmailVerified can come back as true/false, "Yes"/"No", 1/0 from Graph API
+    const emailVerified = user?.EmailVerified === true
+      || user?.EmailVerified === 'Yes'
+      || user?.EmailVerified === 1
+      || user?.emailVerified === true
+      || user?.emailVerified === 'Yes'
+      || user?.emailVerified === 1
+      || false;
     const userStatus    = user?.Status         || user?.status        || '';
     const isAdmin       = user?.IsAdmin === true || user?.isAdmin === true;
     const userName      = user?.Name           || user?.name          || '';
