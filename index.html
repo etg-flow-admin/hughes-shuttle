@@ -95,6 +95,12 @@
   .svc-stops { padding: 10px 13px; }
   .stop-row { display: flex; align-items: flex-start; gap: 9px; padding: 5px 0; font-size: 12px; }
   .stop-row:not(:last-child) { border-bottom: 0.5px solid var(--h-border-sub); }
+  .stop-row-selectable { cursor: pointer; border-radius: 6px; padding: 7px 6px; margin: 0 -6px; transition: background 0.12s; }
+  .stop-row-selectable:hover { background: var(--h-gold-pale); }
+  .stop-row-selectable.stop-selected { background: var(--h-gold-pale); border: 1px solid var(--h-gold); }
+  .stop-select-btn { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--h-gold); white-space: nowrap; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+  .stop-row-selectable:hover .stop-select-btn,
+  .stop-row-selectable.stop-selected .stop-select-btn { opacity: 1; }
   .stop-num { width: 20px; height: 20px; border-radius: 50%; background: var(--h-gold-pale); border: 1px solid var(--h-gold); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--h-navy); flex-shrink: 0; margin-top: 1px; }
   .stop-info { flex: 1; }
   .stop-name { font-weight: 600; color: var(--h-navy); }
@@ -484,41 +490,26 @@ function renderServices() {
     const pct  = Math.round((svc.booked / CAP) * 100);
     const firstTime = svc.times.find(t => t !== '*N/S');
 
+    // Build stop rows — each clickable to select that boarding stop
     let stopRows = '';
     STOPS.forEach((stop, i) => {
       const t = svc.times[i];
       if (t === '*N/S') return;
       if (fStop !== 'all' && String(stop.num) !== fStop) return;
-      stopRows += `<div class="stop-row">
+      stopRows += `<div class="stop-row stop-row-selectable" onclick="selectStop(event, this, ${svc.id}, ${stop.num})">
         <div class="stop-num">${stop.num}</div>
         <div class="stop-info">
           <div class="stop-name">${stop.name}</div>
           <div class="stop-addr">${stop.addr}</div>
         </div>
         <div class="stop-time">${formatTime(t)}</div>
+        <div class="stop-select-btn">Board here</div>
       </div>`;
     });
 
-    if (fStop === 'all') {
-      stopRows = '';
-      STOPS.forEach((stop, i) => {
-        if (svc.times[i] !== '*N/S') {
-          stopRows += `<div class="stop-row">
-            <div class="stop-num">${stop.num}</div>
-            <div class="stop-info">
-              <div class="stop-name">${stop.name}</div>
-              <div class="stop-addr">${stop.addr}</div>
-            </div>
-            <div class="stop-time">${formatTime(svc.times[i])}</div>
-          </div>`;
-        }
-      });
-    }
-
-    const past = isServicePast(svc);
     const card = document.createElement('div');
-    card.className = 'service-card' + (left === 0 ? ' ns' : '') + (past ? ' past-service' : '');
-    if (past) { card.style.opacity = '0.45'; card.style.pointerEvents = 'none'; }
+    card.className = 'service-card' + (left === 0 ? ' ns' : '');
+    card.dataset.svcId = svc.id;
     card.innerHTML = `
       <div class="svc-head">
         <div class="svc-title">Service No.${svc.id}</div>
@@ -530,7 +521,6 @@ function renderServices() {
         <div class="bar-wrap"><div class="bar-fill ${barCls(st)}" style="width:${pct}%"></div></div>
         <span class="seat-txt">${svc.booked}/${CAP}</span>
       </div>`;
-    if (left > 0) card.onclick = () => selectSvc(card, svc, fStop);
     grid.appendChild(card);
   });
 
@@ -539,22 +529,37 @@ function renderServices() {
   }
 }
 
-function selectSvc(el, svc, fStop) {
+function selectStop(event, rowEl, svcId, stopNum) {
+  event.stopPropagation();
+  const svc = SERVICES.find(s => s.id === svcId);
+  if (!svc || seatsLeft(svc) === 0) return;
+  const stop    = STOPS[stopNum - 1];
+  const stopIdx = stopNum - 1;
+
+  // Highlight selected stop row and card
+  document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  const stopIdx = fStop !== 'all' ? +fStop - 1 : svc.times.findIndex(t => t !== '*N/S');
-  const stop    = STOPS[stopIdx];
-  const left    = seatsLeft(svc);
+  rowEl.classList.add('stop-selected');
+  rowEl.closest('.service-card').classList.add('selected');
+
+  const left = seatsLeft(svc);
   document.getElementById('sumService').textContent = 'Service No.' + svc.id;
   document.getElementById('sumStop').textContent    = 'Stop ' + stop.num + ' – ' + stop.name;
   document.getElementById('sumTime').textContent    = formatTime(svc.times[stopIdx]);
   document.getElementById('sumSeats').textContent   = left + ' of ' + CAP + ' remaining';
   window._selectedSvc   = svc;
   window._selectedStop  = stop;
-  window._selectedFStop = fStop;
+  window._selectedFStop = String(stopNum);
   const f = document.getElementById('bookingForm');
   f.style.display = 'block';
   f.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function selectSvc(el, svc, fStop) {
+  // Legacy — redirect to first active stop
+  const stopIdx = fStop !== 'all' ? +fStop - 1 : svc.times.findIndex(t => t !== '*N/S');
+  const rowEl = el.querySelectorAll('.stop-row-selectable')[fStop !== 'all' ? 0 : stopIdx];
+  if (rowEl) selectStop({ stopPropagation: () => {} }, rowEl, svc.id, stopIdx + 1);
 }
 
 function confirmBooking() {
@@ -581,6 +586,7 @@ function confirmBooking() {
 function cancelBooking() {
   document.getElementById('bookingForm').style.display = 'none';
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
   const btn = document.querySelector('#bookingForm .btn-gold');
   if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
   const errEl = document.getElementById('bookingError');
