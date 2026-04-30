@@ -169,13 +169,23 @@ function welcomeTemplate(name, email, tempPassword) {
 }
 
 // ── Booking confirmation email ──
+function formatEmailTime(t) {
+  if (!t || t === '—') return t || '—';
+  const [hStr, mStr] = t.replace(/^0/, '').split(':');
+  const h = parseInt(hStr), m = mStr || '00';
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return String(h12).padStart(2,'0') + ':' + m + ' ' + ampm;
+}
+
 function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travelDate) {
+  const depTimeFormatted = formatEmailTime(depTime);
   const dateFormatted = travelDate.split('-').reverse().join('/');
   const rows = [
     ['Reference',   `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
     ['Service',     `Service No.${serviceNum}`],
     ['Boarding at', stopName],
-    ['Departure',   depTime],
+    ['Departure',   depTimeFormatted],
     ['Date',        dateFormatted],
   ];
   const tableRows = rows.map(([label, value], i) => `
