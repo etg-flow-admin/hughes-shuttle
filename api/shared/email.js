@@ -134,21 +134,37 @@ function otpTemplate(name, otp) {
 
 // ── Welcome / admin-created account email ──
 function welcomeTemplate(name, email, tempPassword) {
+  const rows = [
+    ['Email',               email],
+    ['Temporary password',  `<span style="font-family:'Courier New',monospace;background-color:#F5EDD6;padding:3px 10px;border-radius:4px;font-size:15px;letter-spacing:0.05em;">${tempPassword}</span>`],
+  ];
+  const tableRows = rows.map(([label, value], i) => `
+    <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#F8F6F1'};">
+      <td style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;padding:10px 16px;width:40%;">${label}</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;color:#1A2340;padding:10px 16px;">${value}</td>
+    </tr>`).join('');
+
   const content = `
-    <p style="font-family:Arial,sans-serif;font-size:20px;font-weight:700;color:#1A2340;margin:0 0 8px;">Welcome, ${name}!</p>
-    <p style="font-family:Arial,sans-serif;font-size:14px;color:#6B7280;margin:0 0 6px;line-height:1.6;">Your Hughes Shuttle account has been created. Sign in with the details below.</p>
-    <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;margin:0 0 24px;">Please change your password after your first login.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8F6F1;border-radius:8px;border:1px solid #E5E7EB;margin-bottom:8px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
       <tr>
-        <td style="padding:16px 20px;">
-          <p style="font-family:Arial,sans-serif;font-size:13px;color:#1A2340;margin:0 0 8px;"><strong>Email:</strong> ${email}</p>
-          <p style="font-family:Arial,sans-serif;font-size:13px;color:#1A2340;margin:0;">
-            <strong>Temporary password:</strong>&nbsp;
-            <span style="font-family:'Courier New',monospace;background-color:#F5EDD6;padding:2px 8px;border-radius:4px;">${tempPassword}</span>
-          </p>
+        <td align="center">
+          <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="background-color:#EAF3DE;border-radius:50%;width:48px;height:48px;text-align:center;vertical-align:middle;">
+                <span style="font-size:22px;line-height:48px;">&#128075;</span>
+              </td>
+            </tr>
+          </table>
+          <p style="font-family:Arial,sans-serif;font-size:20px;font-weight:700;color:#1A2340;margin:12px 0 4px;">Welcome, ${name}!</p>
+          <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;margin:0 0 4px;">Your Hughes Shuttle Bus account has been created.</p>
+          <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;margin:0;">Sign in with the details below and change your password after your first login.</p>
         </td>
       </tr>
-    </table>`;
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#E5E7EB;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      ${tableRows}
+    </table>
+    <p style="font-family:Arial,sans-serif;font-size:12px;color:#9CA3AF;text-align:center;margin:0;">For security, please do not share your temporary password with anyone.</p>`;
   return emailWrapper(content);
 }
 

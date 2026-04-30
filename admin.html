@@ -346,15 +346,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <input class="modal-input" id="add-email" type="email" placeholder="jane@example.com">
           </div>
           <div class="modal-field">
-            <label class="modal-label">Student ID *</label>
+            <label class="modal-label">Student ID</label>
             <input class="modal-input" id="add-sid" type="text" placeholder="S12345678">
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">Room number</label>
+            <input class="modal-input" id="add-room" type="text" placeholder="e.g. A204">
           </div>
           <div class="modal-field">
             <label class="modal-label">Temporary password *</label>
             <input class="modal-input" id="add-pw" type="password" placeholder="Min. 8 characters">
           </div>
           <div class="modal-field">
-            <label class="modal-label">Mobile (optional)</label>
+            <label class="modal-label">Mobile</label>
             <input class="modal-input" id="add-mobile" type="tel" placeholder="04XX XXX XXX">
           </div>
         </div>
@@ -898,8 +902,8 @@ async function submitAddUser() {
   const mobile = document.getElementById('add-mobile').value.trim();
   const isAdmin= document.getElementById('add-is-admin').checked;
   const s      = document.getElementById('add-status');
-  if (!name || !email || !sid || !room) {
-    showStatus('add-status', 'Name, email, student ID and room number are required.', 'error'); return;
+  if (!name || !email) {
+    showStatus('add-status', 'Name and email address are required.', 'error'); return;
   }
   if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
     showStatus('add-status', 'Please enter a valid email address.', 'error'); return;
@@ -918,9 +922,8 @@ async function submitAddUser() {
   _users.unshift({ id: email, email, name, sid, roomNumber: room, mobile, status: 'Active', isAdmin, bookings: 0, emailVerified: true });
   updateBadges();
   showStatus('add-status', 'Account created and welcome email sent to ' + email + '.', 'success');
-  ['add-name','add-email','add-sid','add-room','add-pw','add-mobile'].forEach(id => document.getElementById(id).value = '');
+  ['add-name','add-email','add-sid','add-room','add-pw','add-mobile'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('add-is-admin').checked = false;
-  setTimeout(() => switchPanel('users'), 1500);
 }
 
 // ── Bookings ──
