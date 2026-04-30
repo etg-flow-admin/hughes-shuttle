@@ -997,19 +997,18 @@ async function loadServices() {
     const res  = await fetch(API_BASE + `/api/get-services?date=${date}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    if (!res.ok) return;
+    if (!res.ok) { renderServices(); return; }
     const data = await res.json();
-    // Merge live seat data into SERVICES array
+    // Merge live seat data — coerce to number for safe comparison
     (data.services || []).forEach(svc => {
-      const local = SERVICES.find(s => s.id === svc.serviceNumber);
+      const local = SERVICES.find(s => +s.id === +svc.serviceNumber);
       if (local) {
-        local.booked = svc.booked;
-        local.times  = svc.times;
+        local.booked = svc.booked != null ? +svc.booked : local.booked;
+        if (svc.times && svc.times.length === 6) local.times = svc.times;
       }
     });
     renderServices();
   } catch (err) {
-    // Fall back to static data already in SERVICES
     renderServices();
   }
 }

@@ -31,7 +31,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
         const svcNum = String(s.ServiceNumber);
         const avail  = availability[svcNum] || { booked: 0, left: CAPACITY };
         return {
-          id:            s.ID,
+          id:            s.ServiceNumber,
           serviceNumber: s.ServiceNumber,
           times: [
             s.Stop1Time || '*N/S',
