@@ -614,9 +614,6 @@ function switchTab(t) {
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
   document.getElementById('tabMy').className   = 'tab' + (t === 'my'  ? ' active' : '');
 }
-  document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
-  document.getElementById('tabMy').className   = 'tab' + (t === 'my'  ? ' active' : '');
-}
 
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
