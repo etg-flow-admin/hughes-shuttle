@@ -248,6 +248,39 @@
   </div>
 </div>
 
+<!-- ═══════════════ CHANGE PASSWORD ═══════════════ -->
+<div id="changePasswordScreen" class="screen">
+  <div class="hdr">
+    <div class="logo-wrap">
+      <div class="logo-icon" style="background:none;border:none;padding:0;"><img src="data:image/png;base64,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.js" style="height:34px;width:34px;object-fit:contain;border-radius:50%;display:block;"></div>
+      <div class="logo-text">Hughes Shuttle Bus</div>
+    </div>
+  </div>
+  <div class="auth-wrap">
+    <div class="auth-inner">
+      <h2>Change password</h2>
+      <p class="sub">Enter and confirm your new password below.</p>
+      <div class="error-msg" id="changePwError"></div>
+      <div class="field">
+        <label>New password</label>
+        <div class="pw-wrap">
+          <input class="inp" type="password" id="changePw" placeholder="Min. 8 characters">
+          <button class="pw-toggle" onclick="togglePw('changePw',this)">Show</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirm new password</label>
+        <div class="pw-wrap">
+          <input class="inp" type="password" id="changePw2" placeholder="Repeat password">
+          <button class="pw-toggle" onclick="togglePw('changePw2',this)">Show</button>
+        </div>
+      </div>
+      <button class="btn-gold" id="btnChangePw" onclick="submitChangePassword()">Update password</button>
+      <button class="btn-ghost" onclick="goTo('bookingScreen')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ═══════════════ CREATE ACCOUNT ═══════════════ -->
 <div id="createScreen" class="screen">
@@ -455,6 +488,20 @@ function formatTime(t) {
   return String(h12).padStart(2, '0') + ':' + m + ' ' + ampm;
 }
 
+// Is a specific stop time in the past (today only)?
+function isStopPast(t) {
+  if (!t || t === '*N/S') return false;
+  const dateVal = document.getElementById('dateInput').value;
+  if (!dateVal) return false;
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  if (dateVal !== todayStr) return false;
+  const [hStr, mStr] = t.split(':');
+  const stopMins = parseInt(hStr) * 60 + parseInt(mStr || 0);
+  const nowMins  = today.getHours() * 60 + today.getMinutes();
+  return stopMins < nowMins;
+}
+
 // Is a service in the past for the selected date?
 function isServicePast(svc) {
   const dateVal = document.getElementById('dateInput').value;
@@ -496,14 +543,15 @@ function renderServices() {
       const t = svc.times[i];
       if (t === '*N/S') return;
       if (fStop !== 'all' && String(stop.num) !== fStop) return;
-      stopRows += `<div class="stop-row stop-row-selectable" onclick="selectStop(event, this, ${svc.id}, ${stop.num})">
+      const stopPast = isStopPast(t);
+      stopRows += `<div class="stop-row${stopPast ? '' : ' stop-row-selectable'}" ${stopPast ? '' : `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"`} style="${stopPast ? 'opacity:0.4;cursor:default;' : ''}">
         <div class="stop-num">${stop.num}</div>
         <div class="stop-info">
           <div class="stop-name">${stop.name}</div>
           <div class="stop-addr">${stop.addr}</div>
         </div>
         <div class="stop-time">${formatTime(t)}</div>
-        <div class="stop-select-btn">Board here</div>
+        ${stopPast ? '' : '<div class="stop-select-btn">Board here</div>'}
       </div>`;
     });
 
@@ -725,18 +773,37 @@ function toggleAvatarMenu() {
   document.getElementById('avatarMenu').classList.toggle('open');
 }
 function goToChangePassword() {
-  const email = localStorage.getItem('hs_name') ? '' : '';
-  // Pre-fill email from session then go to forgot screen
-  const stored = localStorage.getItem('hs_token');
-  if (stored) {
-    try {
-      const payload = JSON.parse(atob(stored.split('.')[1]));
-      if (payload.email) document.getElementById('forgotEmail').value = payload.email;
-    } catch(e) {}
-  }
-  clearError('forgotError');
+  document.getElementById('changePw').value = '';
+  document.getElementById('changePw2').value = '';
+  clearError('changePwError');
   document.getElementById('avatarMenu').classList.remove('open');
-  goTo('forgotScreen');
+  goTo('changePasswordScreen');
+}
+
+async function submitChangePassword() {
+  clearError('changePwError');
+  const pw  = document.getElementById('changePw').value;
+  const pw2 = document.getElementById('changePw2').value;
+  if (pw.length < 8)  { showError('changePwError', 'Password must be at least 8 characters.'); return; }
+  if (pw !== pw2)     { showError('changePwError', 'Passwords do not match.'); return; }
+  const token = getToken();
+  if (!token) { goTo('loginScreen'); return; }
+  setLoading('btnChangePw', true, 'Updating…');
+  try {
+    const res = await fetch(API_BASE + '/api/update-password', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body:    JSON.stringify({ newPassword: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError('changePwError', data.error || 'Failed to update password.'); return; }
+    // Success — back to booking
+    goTo('bookingScreen');
+  } catch (err) {
+    showError('changePwError', 'Unable to connect. Please try again.');
+  } finally {
+    setLoading('btnChangePw', false, 'Update password');
+  }
 }
 function goToAdmin() {
   window.location.href = '/admin.html';
