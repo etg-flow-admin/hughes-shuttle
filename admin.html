@@ -151,7 +151,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .empty-state p { font-size: 14px; }
 
 /* ── Proto banner ── */
-.proto-banner { background: var(--gold-pale); border-bottom: 0.5px solid var(--gold); padding: 5px 1rem; font-size: 12px; color: var(--warn); text-align: center; font-weight: 500; }
 
 /* ── Schedule editor ── */
 .sched-stop-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border-sub); }
@@ -180,7 +179,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </head>
 <body>
 
-<div class="proto-banner">Prototype — Hughes Shuttle admin portal (UI demo only — no live data)</div>
 
 <!-- ── Top nav ── -->
 <nav class="topnav">
@@ -258,11 +256,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
       </div>
       <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
-        <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value" id="ds-total">6</div></div>
-        <div class="stat-card"><div class="stat-label">Active users</div><div class="stat-value green" id="ds-active">5</div></div>
-        <div class="stat-card"><div class="stat-label">Today's bookings</div><div class="stat-value gold" id="ds-today">11</div></div>
-        <div class="stat-card"><div class="stat-label">Seats filled today</div><div class="stat-value" id="ds-seats">11 / 198</div></div>
-        <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value red" id="ds-cancelled">2</div></div>
+        <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value" id="ds-total">—</div></div>
+        <div class="stat-card"><div class="stat-label">Active users</div><div class="stat-value green" id="ds-active">—</div></div>
+        <div class="stat-card"><div class="stat-label">Today's bookings</div><div class="stat-value gold" id="ds-today">—</div></div>
+        <div class="stat-card"><div class="stat-label">Seats filled today</div><div class="stat-value" id="ds-seats">—</div></div>
+        <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value red" id="ds-cancelled">—</div></div>
       </div>
 
       <!-- Today's service snapshot -->
@@ -681,8 +679,24 @@ async function loadBookings(date, svcFilter, statusFilter) {
 }
 
 function updateBadges() {
+  const todayStr  = today();
+  const todayBks  = _bookings.filter(b => b.date === todayStr);
+  const confirmed = todayBks.filter(b => b.status !== 'Cancelled').length;
+  const cancelled = todayBks.filter(b => b.status === 'Cancelled').length;
+  const totalBooked = SERVICES.reduce((a, s) => a + s.booked, 0);
+
+  // Nav badges
   document.getElementById('badge-users').textContent    = _users.length;
-  document.getElementById('badge-bookings').textContent = _bookings.filter(b => b.status !== 'Cancelled').length;
+  document.getElementById('badge-bookings').textContent = confirmed;
+
+  // Dashboard top row
+  document.getElementById('ds-total').textContent     = _users.length;
+  document.getElementById('ds-active').textContent    = _users.filter(u => u.status === 'Active').length;
+  document.getElementById('ds-today').textContent     = confirmed;
+  document.getElementById('ds-seats').textContent     = totalBooked + ' / ' + (CAP * 9);
+  document.getElementById('ds-cancelled').textContent = cancelled;
+
+  // Users panel stats
   const stats = computeUserStats();
   document.getElementById('u-total').textContent     = stats.total;
   document.getElementById('u-active').textContent    = stats.active;
