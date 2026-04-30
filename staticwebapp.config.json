@@ -1,8 +1,7 @@
 {
   "routes": [
     {
-      "route": "/api/*",
-      "rewrite": "https://hughes-shuttle-api-b0c8grbzbheactam.australiaeast-01.azurewebsites.net/api/*"
+      "route": "/api/*"
     },
     {
       "route": "/*.html",
