@@ -607,6 +607,23 @@ async function authFetch(url, opts = {}) {
 }
 
 // ── Helpers ──
+function formatAEST(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const opts = { timeZone: 'Australia/Sydney', day:'2-digit', month:'2-digit', year:'numeric', hour:'numeric', minute:'2-digit', hour12: true };
+  const parts = new Intl.DateTimeFormat('en-AU', opts).formatToParts(d);
+  const get = type => parts.find(p => p.type === type)?.value || '';
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')} ${get('dayPeriod').toLowerCase()}`;
+}
+function formatSvcTime(t) {
+  if (!t) return '';
+  const [hStr, mStr] = t.replace(/^0/, '').split(':');
+  const h = parseInt(hStr), m = mStr || '00';
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return String(h12).padStart(2,'0') + ':' + m + ' ' + ampm;
+}
 function formatLastLogin(iso) {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -706,7 +723,7 @@ async function loadBookings(date, svcFilter, statusFilter) {
     seats:     1,
     status:    b.status,
     date:      b.travelDate,
-    bookedAt:  b.bookedAt ? b.bookedAt.replace('T',' ').slice(0,16) : '',
+    bookedAt:  b.bookedAt ? formatAEST(b.bookedAt) : '',
   }));
   // Update booking counts on users
   const counts = {};
@@ -1002,7 +1019,7 @@ function renderBookings() {
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
     <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
-    <td>${b.time}</td>
+    <td>${formatSvcTime(b.time)}</td>
     <td>1</td>
     <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
     <td class="muted">${b.bookedAt}</td>
@@ -1058,7 +1075,7 @@ function openBookingDetail(ref) {
       <div><span style="color:var(--muted);">Email</span></div><div>${esc(b.userEmail||'')}</div>
       <div><span style="color:var(--muted);">Service</span></div><div>Service No.${b.svc}</div>
       <div><span style="color:var(--muted);">Stop</span></div><div>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</div>
-      <div><span style="color:var(--muted);">Departure</span></div><div>${b.time}</div>
+      <div><span style="color:var(--muted);">Departure</span></div><div>${formatSvcTime(b.time)}</div>
       <div><span style="color:var(--muted);">Date</span></div><div>${b.date}</div>
       <div><span style="color:var(--muted);">Status</span></div><div><span class="badge ${bkBadge(b.status)}">${b.status}</span></div>
       <div><span style="color:var(--muted);">Booked at</span></div><div>${b.bookedAt}</div>
