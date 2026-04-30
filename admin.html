@@ -1208,7 +1208,7 @@ async function saveSchedule() {
       } else {
         input.style.borderColor = '';
         const [hh, mm] = input.value.split(':');
-        newTimes.push(parseInt(hh) + ':' + mm);
+        newTimes.push(String(parseInt(hh)).padStart(2,'0') + ':' + mm);
         hasStop = true;
       }
     }
