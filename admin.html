@@ -743,16 +743,22 @@ function computeUserStats() {
   };
 }
 
-// ── Panel switching ──
 function switchPanel(key) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + key).classList.add('active');
   event && event.currentTarget && event.currentTarget.classList.add('active');
+
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
   if (key === 'history')  { reloadHistory(); }
   if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
+
+  // 👇 ADD THIS
+  if (window.innerWidth <= 768) {
+    document.querySelector('.sidebar')?.classList.remove('open');
+    document.getElementById('sidebarOverlay')?.classList.remove('show');
+  }
 }
 
 // ── Dashboard services ──
@@ -1163,15 +1169,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.que
 
 document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', function() {
-    // active state
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     this.classList.add('active');
-
-    // 👇 ADD THIS
-    if (window.innerWidth <= 768) {
-      document.querySelector('.sidebar')?.classList.remove('open');
-      document.getElementById('sidebarOverlay')?.classList.remove('show');
-    }
   });
 });
 function toggleSidebar() {
