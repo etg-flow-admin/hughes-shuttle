@@ -1222,6 +1222,20 @@ function filterMyBookings() {
   renderMyBookingsList(filtered);
 }
 
+function isBookingPast(b) {
+  if (!b.travelDate) return false;
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  if (b.travelDate < todayStr) return true;  // past date
+  if (b.travelDate > todayStr) return false; // future date
+  // Same day — check departure time
+  if (!b.depTime) return false;
+  const [hStr, mStr] = b.depTime.split(':');
+  const depMins = parseInt(hStr) * 60 + parseInt(mStr || 0);
+  const nowMins = today.getHours() * 60 + today.getMinutes();
+  return depMins < nowMins;
+}
+
 function renderMyBookingsList(bookings) {
   const list = document.getElementById('myBookingsList');
   if (!bookings.length) {
@@ -1239,9 +1253,9 @@ function renderMyBookingsList(bookings) {
       </div>
       <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
         <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
-        ${!b.cancelled ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
+        ${!b.cancelled && !isBookingPast(b) ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
       </div>
-      ${!b.cancelled ? `
+      ${!b.cancelled && !isBookingPast(b) ? `
       <div class="cancel-confirm" id="cancel-confirm-${b.ref}">
         <p>Cancel this booking? Your seat will be released.</p>
         <div class="cancel-confirm-btns">
