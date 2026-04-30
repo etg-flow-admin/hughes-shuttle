@@ -49,7 +49,11 @@ async function getListItems(listName, filter = '', select = '', top = 500) {
   let url = `${GRAPH_BASE}/${listId}/items?$expand=fields&$top=${top}`;
   if (graphFilter) url += `&$filter=${encodeURIComponent(graphFilter)}`;
   const res  = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly',
+    }
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`getListItems(${listName}) failed: ${JSON.stringify(data)}`);
