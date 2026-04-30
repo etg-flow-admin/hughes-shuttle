@@ -132,8 +132,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle-slider { position: absolute; inset: 0; background: var(--border-sub); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
 .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
-.toggle input:checked + .toggle-slider { background: #3B6D11; }
-.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
+.toggle input:checked + .toggle-slider { background: #3B6D11 !important; }
+.toggle input:not(:checked) + .toggle-slider { background: #A32D2D !important; }
+label.toggle input:checked + .toggle-slider { background: #3B6D11; }
+label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
 .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
 
 /* ── Modal ── */

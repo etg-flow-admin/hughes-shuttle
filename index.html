@@ -1001,6 +1001,11 @@ async function confirmBooking() {
 let _myBookings = [];
 function addMyBooking(b) {
   _myBookings.unshift(b);
+  _myBookings.sort((a, c) => {
+    if (a.travelDate !== c.travelDate) return a.travelDate.localeCompare(c.travelDate);
+    const toMins = t => { if (!t) return 0; const [h,m] = t.split(':'); return parseInt(h)*60+parseInt(m||0); };
+    return toMins(a.depTime) - toMins(c.depTime);
+  });
   filterMyBookings();
 }
 async function loadMyBookings() {
