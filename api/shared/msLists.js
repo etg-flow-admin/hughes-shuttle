@@ -17,7 +17,7 @@ const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 
 // Explicit field selects for each list — required to retrieve hidden fields
 const LIST_FIELDS = {
-  ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt',
+  ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt,TwoFactorCode,TwoFactorExpiry,TrustedDevices',
   ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
   ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time',
 };

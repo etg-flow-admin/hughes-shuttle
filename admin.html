@@ -1414,21 +1414,8 @@ function exportUsersCSV() {
   exportCSV('users-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
-setAdminAvatar();
-init();
+document.addEventListener('DOMContentLoaded', () => { setAdminAvatar(); init(); });
 </script>
-
-<!-- ════ CONFIRM MODAL ════ -->
-<div class="modal-overlay" id="modal-confirm">
-  <div class="modal" style="max-width:400px;">
-    <div class="modal-title" id="confirm-title"></div>
-    <p id="confirm-message" style="font-size:14px;color:var(--muted);margin:10px 0 1.5rem;line-height:1.5;"></p>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button class="btn btn-outline" onclick="closeModal('modal-confirm')">Cancel</button>
-      <button class="btn btn-gold" id="confirm-ok"></button>
-    </div>
-  </div>
-</div>
 
 <!-- ════ ADMIN 2FA SCREEN ════ -->
 <div id="admin-2fa-overlay" style="display:none;position:fixed;inset:0;background:var(--offwhite);z-index:9999;align-items:center;justify-content:center;">
@@ -1456,6 +1443,18 @@ init();
     </label>
     <button class="btn btn-gold" id="tfa-btn" onclick="submitAdminTfa()" style="width:100%;justify-content:center;">Verify</button>
     <button onclick="tfaCancel()" style="width:100%;margin-top:8px;padding:9px;background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit;">Cancel — go to sign in</button>
+  </div>
+</div>
+
+<!-- ════ CONFIRM MODAL ════ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-title" id="confirm-title"></div>
+    <p id="confirm-message" style="font-size:14px;color:var(--muted);margin:10px 0 1.5rem;line-height:1.5;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal('modal-confirm')">Cancel</button>
+      <button class="btn btn-gold" id="confirm-ok"></button>
+    </div>
   </div>
 </div>
 
