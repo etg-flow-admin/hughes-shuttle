@@ -432,14 +432,19 @@
 
       <!-- MY BOOKINGS PANEL -->
       <div id="panelMy" style="display:none;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;flex-wrap:wrap;">
           <p class="sel-label" style="margin:0;flex-shrink:0;">My bookings</p>
-          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-            <button onclick="shiftMyDate(-1)" style="background:var(--h-navy);color:var(--h-gold);border:none;border-radius:6px;width:28px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;font-weight:bold;line-height:1;">&#8249;</button>
-            <input class="inp" type="date" id="myBookingsDate" style="width:auto;font-size:13px;padding:6px 10px;" onchange="filterMyBookings()">
-            <button onclick="shiftMyDate(1)" style="background:var(--h-navy);color:var(--h-gold);border:none;border-radius:6px;width:28px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;font-weight:bold;line-height:1;">&#8250;</button>
+          <div style="display:flex;gap:4px;margin-left:auto;">
+            <button id="viewBtnWeek" onclick="setMyView('week')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-navy);color:var(--h-gold);">Week</button>
+            <button id="viewBtnDay" onclick="setMyView('day')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-offwhite);color:var(--h-muted);border:0.5px solid var(--h-border-sub);">Day</button>
           </div>
         </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.75rem;" id="myNavRow">
+          <button onclick="shiftMyPeriod(-1)" style="background:var(--h-navy);color:var(--h-gold);border:none;border-radius:6px;width:28px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;font-weight:bold;line-height:1;">&#8249;</button>
+          <div id="myPeriodLabel" style="flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--h-navy);"></div>
+          <button onclick="shiftMyPeriod(1)" style="background:var(--h-navy);color:var(--h-gold);border:none;border-radius:6px;width:28px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;font-weight:bold;line-height:1;">&#8250;</button>
+        </div>
+        <input type="hidden" id="myBookingsDate" value="">
         <div id="myBookingsList">
           <div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">Loading…</div>
         </div>
@@ -757,13 +762,7 @@ function shiftDate(days) {
 }
 
 function shiftMyDate(days) {
-  const input = document.getElementById('myBookingsDate');
-  const current = input.value ? new Date(input.value + 'T12:00') : new Date();
-  current.setDate(current.getDate() + days);
-  input.value = current.getFullYear() + '-' +
-    String(current.getMonth() + 1).padStart(2, '0') + '-' +
-    String(current.getDate()).padStart(2, '0');
-  filterMyBookings();
+  shiftMyPeriod(days > 0 ? 1 : -1);
 }
 
 
@@ -1203,23 +1202,77 @@ async function loadMyBookings() {
       if (a.cancelled !== b.cancelled) return a.cancelled ? 1 : -1;
       return 0;
     });
-    // Default filter to today
-    const myDateEl = document.getElementById('myBookingsDate');
-    if (myDateEl && !myDateEl.value) myDateEl.value = _localTodayStr;
+    // Default anchor to this week
+    if (!_myAnchor) _myAnchor = getMondayOf(_localTodayStr);
     filterMyBookings();
   } catch (err) { /* silently fail */ }
 }
+// ── My Bookings view state ──
+let _myView = 'week';
+let _myAnchor = null;
+
+function dateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function addDays(isoStr, n) {
+  const d = new Date(isoStr + 'T12:00'); d.setDate(d.getDate() + n); return dateStr(d);
+}
+function getMondayOf(isoStr) {
+  const d = new Date(isoStr + 'T12:00');
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return dateStr(d);
+}
+function fmtDay(isoStr) {
+  return new Date(isoStr + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'short' });
+}
+
+function setMyView(view) {
+  _myView = view;
+  const on  = 'padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-navy);color:var(--h-gold);';
+  const off = 'padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-offwhite);color:var(--h-muted);border:0.5px solid var(--h-border-sub);';
+  document.getElementById('viewBtnWeek').style.cssText = view === 'week' ? on : off;
+  document.getElementById('viewBtnDay').style.cssText  = view === 'day'  ? on : off;
+  if (view === 'week') _myAnchor = getMondayOf(_myAnchor || _localTodayStr);
+  filterMyBookings();
+}
+
+function shiftMyPeriod(dir) {
+  _myAnchor = addDays(_myAnchor || (_myView === 'week' ? getMondayOf(_localTodayStr) : _localTodayStr), dir * (_myView === 'week' ? 7 : 1));
+  filterMyBookings();
+}
+
 function filterMyBookings() {
-  const dateVal = document.getElementById('myBookingsDate').value;
+  if (!_myAnchor) _myAnchor = _myView === 'week' ? getMondayOf(_localTodayStr) : _localTodayStr;
   const list = document.getElementById('myBookingsList');
-  const filtered = dateVal
-    ? _myBookings.filter(b => b.travelDate === dateVal || !b.travelDate)
-    : _myBookings;
-  if (!filtered.length) {
-    list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this date.</div>';
-    return;
+  if (!list) return;
+
+  if (_myView === 'week') {
+    const weekStart = getMondayOf(_myAnchor);
+    const weekEnd   = addDays(weekStart, 6);
+    const s = new Date(weekStart + 'T12:00'), e = new Date(weekEnd + 'T12:00');
+    document.getElementById('myPeriodLabel').textContent =
+      s.toLocaleDateString('en-AU', { day:'numeric', month:'short' }) + ' – ' +
+      e.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+    const days = Array.from({length:7}, (_,i) => addDays(weekStart, i));
+    const hasAny = days.some(d => _myBookings.some(b => b.travelDate === d));
+    if (!hasAny) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings this week.</div>'; return; }
+    list.innerHTML = days.map(day => {
+      const bks = _myBookings.filter(b => b.travelDate === day);
+      if (!bks.length) return '';
+      const isToday = day === _localTodayStr;
+      return '<div style="margin-bottom:1rem;">' +
+        '<div style="font-size:11px;font-weight:700;color:var(--h-navy);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:0.5rem;padding-bottom:4px;border-bottom:1.5px solid ' + (isToday ? 'var(--h-gold)' : 'var(--h-border-sub)') + ';">' +
+        fmtDay(day) + (isToday ? ' <span style="color:var(--h-gold);">· Today</span>' : '') + '</div>' +
+        bks.map(b => bookingCardHTML(b)).join('') + '</div>';
+    }).join('');
+  } else {
+    const day = _myAnchor;
+    document.getElementById('myPeriodLabel').textContent = fmtDay(day) + (day === _localTodayStr ? ' · Today' : '');
+    const bks = _myBookings.filter(b => b.travelDate === day);
+    if (!bks.length) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this day.</div>'; return; }
+    list.innerHTML = bks.map(b => bookingCardHTML(b)).join('');
   }
-  renderMyBookingsList(filtered);
 }
 
 function isBookingPast(b) {
@@ -1236,18 +1289,13 @@ function isBookingPast(b) {
   return depMins < nowMins;
 }
 
-function renderMyBookingsList(bookings) {
-  const list = document.getElementById('myBookingsList');
-  if (!bookings.length) {
-    list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings yet.</div>';
-    return;
-  }
-  list.innerHTML = bookings.map(b => `
+function bookingCardHTML(b) {
+  return `
     <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.55;' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
-          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">${b.date} · Stop ${b.stopNum} · ${b.depTime} · 1 seat</div>
+          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Stop ${b.stopNum} · ${formatTime(b.depTime)} · 1 seat</div>
         </div>
         <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>
@@ -1263,8 +1311,9 @@ function renderMyBookingsList(bookings) {
           <button class="btn-cancel-confirm btn-cancel-no" onclick="hideCancelConfirm('${b.ref}')">Keep booking</button>
         </div>
       </div>` : ''}
-    </div>`).join('');
+    </div>`;
 }
+function renderMyBookingsList(bookings) { filterMyBookings(); }
 
 function showCancelConfirm(ref) {
   // Hide any other open confirms first
@@ -1315,7 +1364,7 @@ const _localTodayStr = _localToday.getFullYear() + '-' +
   String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
   String(_localToday.getDate()).padStart(2, '0');
 document.getElementById('dateInput').value = _localTodayStr;
-document.getElementById('myBookingsDate').value = _localTodayStr;
+_myAnchor = null; // will be set to this week's Monday on first filterMyBookings call
 
 // ══ CHECK EXISTING SESSION ON LOAD ══
 (function() {
