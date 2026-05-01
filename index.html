@@ -966,10 +966,14 @@ async function tryLogin() {
 
   setLoading('btnLogin', true, 'Sign in');
   try {
+    // Read trusted device cookie if present
+    const deviceCookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('hs_admin_device='));
+    const deviceToken  = deviceCookie ? deviceCookie.slice('hs_admin_device='.length) : undefined;
+
     const res  = await fetch(API_BASE + '/api/portal-login', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email, password })
+      body:    JSON.stringify({ email, password, ...(deviceToken ? { deviceToken } : {}) })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -980,6 +984,13 @@ async function tryLogin() {
       } else {
         showError('loginError', data.error || 'Incorrect email or password.');
       }
+      return;
+    }
+    if (data.requires2FA) {
+      // Admin needs 2FA — store pending info and redirect to admin portal 2FA screen
+      sessionStorage.setItem('hs_2fa_email', data.email);
+      sessionStorage.setItem('hs_2fa_name',  data.name);
+      window.location.href = '/admin.html?2fa=1';
       return;
     }
     setSession(data.token, data.name, data.isAdmin);

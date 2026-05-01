@@ -653,18 +653,115 @@ function showStatus(elId, msg, type) {
   el.className = 'modal-status show ' + (type || 'success');
 }
 
+// ── Admin 2FA ──
+const DEVICE_COOKIE = 'hs_admin_device';
+let _tfaEmail = null;
+
+function getDeviceToken() {
+  const m = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(DEVICE_COOKIE + '='));
+  return m ? m.slice(DEVICE_COOKIE.length + 1) : null;
+}
+function setDeviceCookie(token) {
+  const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = DEVICE_COOKIE + '=' + token + '; expires=' + exp + '; path=/; SameSite=Strict';
+}
+function clearDeviceCookie() {
+  document.cookie = DEVICE_COOKIE + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+}
+
+function showAdminTfa(email) {
+  _tfaEmail = email;
+  document.getElementById('tfa-email').textContent = email;
+  document.getElementById('tfa-status').className = 'modal-status';
+  document.getElementById('tfa-status').textContent = '';
+  ['a1','a2','a3','a4','a5','a6'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = ''; el.disabled = false; el.style.borderColor = '';
+  });
+  document.getElementById('tfa-trust').checked = false;
+  document.getElementById('admin-2fa-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('a1').focus(), 100);
+}
+function hideAdminTfa() {
+  document.getElementById('admin-2fa-overlay').style.display = 'none';
+}
+function tfaCancel() {
+  hideAdminTfa();
+  window.location.href = '/index.html';
+}
+function tfaInput(el, nextId) {
+  el.value = el.value.replace(/\D/g, '');
+  if (el.value && nextId) document.getElementById(nextId).focus();
+  if (['a1','a2','a3','a4','a5','a6'].every(id => document.getElementById(id).value)) submitAdminTfa();
+}
+function tfaBack(e, el, prevId) {
+  if (e.key === 'Backspace' && !el.value && prevId) document.getElementById(prevId).focus();
+}
+function getTfaCode() {
+  return ['a1','a2','a3','a4','a5','a6'].map(id => document.getElementById(id).value).join('');
+}
+async function submitAdminTfa() {
+  const otp = getTfaCode();
+  if (otp.length < 6) return;
+  const trust = document.getElementById('tfa-trust').checked;
+  const btn   = document.getElementById('tfa-btn');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  ['a1','a2','a3','a4','a5','a6'].forEach(id => document.getElementById(id).disabled = true);
+  try {
+    const res  = await fetch(API_BASE + '/api/admin-verify-2fa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: _tfaEmail, otp, trustDevice: trust })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      ['a1','a2','a3','a4','a5','a6'].forEach(id => { document.getElementById(id).disabled = false; document.getElementById(id).style.borderColor = '#E24B4A'; });
+      document.getElementById('a1').focus();
+      const st = document.getElementById('tfa-status');
+      st.textContent = data.error || 'Invalid code.';
+      st.className = 'modal-status show error';
+      btn.disabled = false; btn.textContent = 'Verify'; return;
+    }
+    if (trust && data.deviceToken) setDeviceCookie(data.deviceToken);
+    localStorage.setItem('hs_token', data.token);
+    localStorage.setItem('hs_name',  data.name);
+    localStorage.setItem('hs_isAdmin', '1');
+    hideAdminTfa();
+    await loadDashboard();
+  } catch (err) {
+    const st = document.getElementById('tfa-status');
+    st.textContent = 'Unable to connect. Please try again.';
+    st.className = 'modal-status show error';
+    btn.disabled = false; btn.textContent = 'Verify';
+    ['a1','a2','a3','a4','a5','a6'].forEach(id => document.getElementById(id).disabled = false);
+  }
+}
+
 // ── Init ──
 async function init() {
   setAdminAvatar();
+
+  // Check if arriving from login with 2FA required
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('2fa') === '1') {
+    const email = sessionStorage.getItem('hs_2fa_email');
+    const name  = sessionStorage.getItem('hs_2fa_name');
+    sessionStorage.removeItem('hs_2fa_email');
+    sessionStorage.removeItem('hs_2fa_name');
+    if (email) { showAdminTfa(email); return; }
+  }
+
   const token = getToken();
   if (!token) { window.location.href = '/index.html'; return; }
-  // Check isAdmin
   const isAdmin = localStorage.getItem('hs_isAdmin');
   if (isAdmin !== '1') { window.location.href = '/index.html'; return; }
+  await loadDashboard();
+}
 
+async function loadDashboard() {
+  setAdminAvatar();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   document.getElementById('booking-date-filter').value = today();
-
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
@@ -1330,6 +1427,35 @@ init();
       <button class="btn btn-outline" onclick="closeModal('modal-confirm')">Cancel</button>
       <button class="btn btn-gold" id="confirm-ok"></button>
     </div>
+  </div>
+</div>
+
+<!-- ════ ADMIN 2FA SCREEN ════ -->
+<div id="admin-2fa-overlay" style="display:none;position:fixed;inset:0;background:var(--offwhite);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--white);border-radius:12px;padding:2rem;width:100%;max-width:400px;margin:1rem;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+    <div style="text-align:center;margin-bottom:1.5rem;">
+      <div style="width:48px;height:48px;background:var(--gold-pale);border:2px solid var(--gold);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:22px;">&#128274;</div>
+      <div style="font-size:20px;font-weight:700;color:var(--navy);">Two-step verification</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px;">A 6-digit code has been sent to <strong id="tfa-email" style="color:var(--navy);"></strong></div>
+    </div>
+    <div class="modal-status" id="tfa-status"></div>
+    <div style="display:flex;gap:8px;justify-content:center;margin:1.25rem 0;">
+      <input class="otp-box" id="a1" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,'a2')" onkeydown="tfaBack(event,this,null)" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+      <input class="otp-box" id="a2" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,'a3')" onkeydown="tfaBack(event,this,'a1')" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+      <input class="otp-box" id="a3" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,'a4')" onkeydown="tfaBack(event,this,'a2')" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+      <input class="otp-box" id="a4" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,'a5')" onkeydown="tfaBack(event,this,'a3')" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+      <input class="otp-box" id="a5" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,'a6')" onkeydown="tfaBack(event,this,'a4')" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+      <input class="otp-box" id="a6" maxlength="1" type="text" inputmode="numeric" oninput="tfaInput(this,null)" onkeydown="tfaBack(event,this,'a5')" style="width:48px;height:56px;border:0.5px solid var(--border-sub);border-radius:7px;font-size:22px;font-weight:600;text-align:center;color:var(--navy);background:var(--offwhite);outline:none;font-family:inherit;">
+    </div>
+    <p style="font-size:12px;color:var(--muted);text-align:center;background:var(--gold-pale);border-radius:6px;padding:8px 12px;margin-bottom:1.25rem;">
+      &#128231; Can't find it? Check your <strong>junk or spam folder</strong>.
+    </p>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:1.25rem;cursor:pointer;">
+      <input type="checkbox" id="tfa-trust" style="width:15px;height:15px;accent-color:var(--gold);cursor:pointer;">
+      Trust this device for 30 days
+    </label>
+    <button class="btn btn-gold" id="tfa-btn" onclick="submitAdminTfa()" style="width:100%;justify-content:center;">Verify</button>
+    <button onclick="tfaCancel()" style="width:100%;margin-top:8px;padding:9px;background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit;">Cancel — go to sign in</button>
   </div>
 </div>
 
