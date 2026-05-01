@@ -18,7 +18,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
     // Get schedule from Microsoft Lists
     const scheduleItems = await getListItems(
       'ShuttleServices', '', 
-      'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time',
+      'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled',
       20
     );
 
@@ -40,7 +40,9 @@ module.exports = wrapHandler('get-services', async function (context, req) {
             s.Stop4Time || '*N/S',
             s.Stop5Time || '*N/S',
             s.Stop6Time || '*N/S',
+            s.Stop7Time || '*N/S',
           ],
+          disabled: s.IsDisabled === true,
           booked:   avail.booked,
           seatsLeft: avail.left,
           capacity:  CAPACITY,

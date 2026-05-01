@@ -200,6 +200,7 @@ function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travel
     ['Departure',   depTimeFormatted],
     ['Date',        dateFormatted],
   ];
+  const cancelUrl = `https://book.hughesshuttle.com.au?cancel=${ref}`;
   const tableRows = rows.map(([label, value], i) => `
     <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#F8F6F1'};">
       <td style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;padding:10px 16px;width:40%;">${label}</td>
@@ -224,7 +225,10 @@ function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travel
     </table>
     <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#E5E7EB;border-radius:8px;overflow:hidden;">
       ${tableRows}
-    </table>`;
+    </table>
+    <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;text-align:center;margin:20px 0 0;">
+      Need to cancel? <a href="${cancelUrl}" style="color:#A32D2D;font-weight:600;">Cancel this booking</a>
+    </p>`;
   return emailWrapper(content);
 }
 

@@ -8,8 +8,8 @@ const { sendEmail, otpTemplate }      = require('../shared/email');
 module.exports = wrapHandler('create-account', async function (context, req) {
   const { name, email: raw, studentId, roomNumber, password } = req.body || {};
   const email = (raw || '').toLowerCase().trim();
-  if (!name || !email || !studentId || !roomNumber || !password) {
-    context.res = { status: 400, body: { error: 'All fields are required.' } }; return;
+  if (!email || !studentId || !password) {
+    context.res = { status: 400, body: { error: 'Email, student ID and password are required.' } }; return;
   }
   if (password.length < 8) {
     context.res = { status: 400, body: { error: 'Password must be at least 8 characters.' } }; return;
@@ -29,9 +29,9 @@ module.exports = wrapHandler('create-account', async function (context, req) {
     const otpExpiry    = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     await createListItem('ShuttleUsers', {
       Title:         email,
-      Name:          name.trim(),
+      Name:          (name || email.split('@')[0]).trim(),
       StudentID:     studentId.trim().toUpperCase(),
-      RoomNumber:    roomNumber.trim().toUpperCase(),
+      RoomNumber:    (roomNumber || '').trim().toUpperCase(),
       PasswordHash:  passwordHash,
       Status:        'New',
       IsAdmin:       false,

@@ -9,7 +9,7 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
   catch (err) { authError(context, err); return; }
 
   const { serviceNumber, times } = req.body || {};
-  if (!serviceNumber || !Array.isArray(times) || times.length !== 6) {
+  if (!serviceNumber || !Array.isArray(times) || times.length < 6) {
     context.res = { status: 400, body: { error: 'serviceNumber and times array (6 entries) are required.' } }; return;
   }
   const hasActive = times.some(t => t !== '*N/S' && t);
@@ -18,6 +18,7 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
   }
   try {
     const existing = await getListItem('ShuttleServices', `ServiceNumber eq ${serviceNumber}`);
+    const isDisabled = req.body.disabled === true;
     const fields = {
       ServiceNumber: serviceNumber,
       Stop1Time: times[0] || '*N/S',
@@ -26,6 +27,8 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
       Stop4Time: times[3] || '*N/S',
       Stop5Time: times[4] || '*N/S',
       Stop6Time: times[5] || '*N/S',
+      Stop7Time: times[6] || '*N/S',
+      IsDisabled: isDisabled,
       UpdatedAt: new Date().toISOString(),
     };
     if (existing) {

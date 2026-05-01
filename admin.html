@@ -236,10 +236,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       All bookings
       <span class="nav-badge" id="badge-bookings">0</span>
     </div>
-    <div class="nav-item" onclick="switchPanel('history')">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-      Booking history
-    </div>
 
     <div class="sidebar-section">Services</div>
     <div class="nav-item" onclick="switchPanel('services')">
@@ -399,6 +395,17 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <option value="Pending">Pending</option>
           </select>
           <span class="record-count" id="booking-count"></span>
+          <select class="filter-select" id="booking-export-range" onchange="document.getElementById('booking-export-custom').style.display=this.value==='custom'?'flex':'none'" style="font-size:12px;">
+            <option value="current">Current month</option>
+            <option value="previous">Previous month</option>
+            <option value="all">All bookings</option>
+            <option value="custom">Custom range</option>
+          </select>
+          <span id="booking-export-custom" style="display:none;gap:4px;align-items:center;">
+            <input type="date" class="filter-select" id="export-from" style="font-size:12px;">
+            <span style="font-size:12px;color:var(--muted);">to</span>
+            <input type="date" class="filter-select" id="export-to" style="font-size:12px;">
+          </span>
           <button class="btn btn-outline btn-sm" onclick="exportBookingsCSV()">&#8595; Export CSV</button>
         </div>
       </div>
@@ -408,31 +415,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
           </tr></thead>
           <tbody id="booking-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- ════ BOOKING HISTORY ════ -->
-    <div class="panel" id="panel-history">
-      <div class="page-header">
-        <div><div class="page-title">Booking history</div><div class="page-sub">Historical record of all shuttle bookings</div></div>
-        <div class="header-actions" style="flex-wrap:wrap;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">&#8595; Export CSV</button>
-          <input class="filter-select" type="text" id="hist-search" placeholder="Search name or student ID..." oninput="renderHistory()" style="min-width:200px;">
-          <select class="filter-select" id="hist-filter" onchange="reloadHistory()">
-            <option value="all">All bookings</option>
-            <option value="Confirmed">Confirmed only</option>
-            <option value="Cancelled">Cancelled only</option>
-          </select>
-          <span class="record-count" id="hist-count"></span>
-        </div>
-      </div>
-      <div class="table-wrap" style="overflow-x:auto;">
-        <table class="data-table">
-          <thead><tr>
-            <th>Ref</th><th>Student</th><th>Student ID</th><th>Room</th><th>Service</th><th>Date</th><th>Stop</th><th>Status</th><th>Booked at</th>
-          </tr></thead>
-          <tbody id="hist-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -451,7 +433,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Service</th><th>First departure</th><th>Stops served</th><th>Capacity</th><th>Booked</th><th>Available</th><th>Fill %</th><th>Status</th><th></th>
+            <th>Service</th><th>First departure</th><th>Stops served</th><th>Capacity</th><th>Booked</th><th>Available</th><th>Fill %</th><th>Status</th><th>Actions</th>
           </tr></thead>
           <tbody id="svc-tbody"></tbody>
         </table>
@@ -559,19 +541,20 @@ const STOPS = [
   { num:4, name:'Bus Interchange Centre',       addr:'Stop C3 King William St - East side' },
   { num:5, name:'City Campus East',             addr:'Business School' },
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
+  { num:7, name:'Adelaide University Village',  addr:'Return - 210 Grote St' },
 ];
 
 // Live data — populated from API
 let SERVICES = [
-  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0 },
-  { id:2, times:['7:05','7:15','*N/S','7:20','7:25','*N/S'],   booked:0 },
-  { id:3, times:['7:40','7:50','*N/S','7:55','8:05','*N/S'],   booked:0 },
-  { id:4, times:['8:20','8:30','*N/S','8:40','8:50','*N/S'],   booked:0 },
-  { id:5, times:['9:10','*N/S','9:20','*N/S','*N/S','*N/S'],   booked:0 },
-  { id:6, times:['9:30','9:40','*N/S','9:50','10:00','*N/S'],  booked:0 },
-  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'],booked:0 },
-  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40'],booked:0 },
-  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20'],booked:0 },
+  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0, disabled:false },
+  { id:2, times:['7:05','7:15','*N/S','7:20','7:25','*N/S'],   booked:0, disabled:false },
+  { id:3, times:['7:40','7:50','*N/S','7:55','8:05','*N/S'],   booked:0, disabled:false },
+  { id:4, times:['8:20','8:30','*N/S','8:40','8:50','*N/S'],   booked:0, disabled:false },
+  { id:5, times:['9:10','*N/S','9:20','*N/S','*N/S','*N/S'],   booked:0, disabled:false },
+  { id:6, times:['9:30','9:40','*N/S','9:50','10:00','*N/S'],  booked:0, disabled:false },
+  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'],booked:0, disabled:false },
+  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40','11:45'],booked:0, disabled:false },
+  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20','12:25'],booked:0 },
 ];
 
 let _users    = [];
@@ -796,7 +779,7 @@ async function loadServices() {
   const data = await res.json();
   (data.services || []).forEach(svc => {
     const local = SERVICES.find(s => s.id === svc.serviceNumber);
-    if (local) { local.booked = svc.booked; local.times = svc.times; }
+    if (local) { local.booked = svc.booked; local.times = svc.times; local.disabled = svc.disabled === true; }
   });
 }
 
@@ -876,7 +859,6 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'history')  { reloadHistory(); }
   if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
 }
 
@@ -1246,12 +1228,29 @@ function renderServicesPanel() {
           <span style="font-size:12px;color:var(--muted);min-width:28px;">${pct}%</span>
         </div>
       </td>
-      <td><span class="badge ${bc}">${st}</span></td>
-      <td><button class="btn btn-outline btn-sm" onclick="openEditSchedule(${s.id})">Edit schedule</button></td>
+      <td><span class="badge ${s.disabled ? 'badge-suspended' : bc}">${s.disabled ? 'Disabled' : st}</span></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="openEditSchedule(${s.id})">Edit schedule</button>
+        <button class="btn btn-sm ${s.disabled ? 'btn-gold' : 'btn-danger'}" onclick="toggleServiceDisabled(${s.id})">${s.disabled ? 'Enable' : 'Disable'}</button>
+      </td>
     </tr>`;
   }).join('');
 }
 
+async function toggleServiceDisabled(svcId) {
+  const svc = SERVICES.find(s => s.id === svcId);
+  if (!svc) return;
+  const newDisabled = !svc.disabled;
+  const res = await authFetch('/api/mgmt-update-schedule', {
+    method: 'POST',
+    body: JSON.stringify({ serviceNumber: svcId, times: svc.times, disabled: newDisabled })
+  });
+  if (res && res.ok) {
+    svc.disabled = newDisabled;
+    renderServicesPanel();
+    showStatus('sched-status', 'Service No.' + svcId + (newDisabled ? ' disabled.' : ' enabled.'), newDisabled ? 'error' : 'success');
+  }
+}
 function renderServices() { renderServicesPanel(); }
 
 // ── Schedule editor ──
@@ -1384,21 +1383,34 @@ function exportCSV(filename, headers, rows) {
 }
 
 function exportBookingsCSV() {
-  const dateF = document.getElementById('booking-date-filter').value;
-  const svcF  = document.getElementById('booking-svc-filter').value;
-  const stF   = document.getElementById('booking-status-filter').value;
-  let bks = _bookings.filter(b =>
-    (!dateF || b.date === dateF) &&
-    (svcF === 'all' || String(b.svc) === svcF) &&
-    (stF  === 'all' || b.status === stF)
-  );
+  const range = document.getElementById('booking-export-range')?.value || 'all';
+  const now   = new Date();
+  let fromDate = null, toDate = null, label = 'all';
+  if (range === 'current') {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+    toDate   = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10);
+    label = now.toLocaleDateString('en-AU', { month:'short', year:'numeric' }).replace(' ','-');
+  } else if (range === 'previous') {
+    const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    fromDate = prev.toISOString().slice(0,10);
+    toDate   = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0,10);
+    label = prev.toLocaleDateString('en-AU', { month:'short', year:'numeric' }).replace(' ','-');
+  } else if (range === 'custom') {
+    fromDate = document.getElementById('export-from').value;
+    toDate   = document.getElementById('export-to').value;
+    label = (fromDate || 'start') + '-to-' + (toDate || 'end');
+  }
+  let bks = _bookings.filter(b => {
+    if (fromDate && b.date < fromDate) return false;
+    if (toDate   && b.date > toDate)   return false;
+    return true;
+  });
   const headers = ['Reference','Name','Student ID','Room','Email','Service','Stop','Stop Name','Departure','Date','Seats','Status','Booked At'];
   const rows = bks.map(b => [
     b.ref, b.name, b.sid||'', b.roomNumber||'', b.userEmail||'',
     'Service No.'+b.svc, 'Stop '+b.stopNum, STOPS[b.stopNum-1]?.name||'',
     b.time||'', b.date||'', 1, b.status, b.bookedAt||''
   ]);
-  const label = dateF ? dateF : 'all-dates';
   exportCSV('bookings-' + label + '-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
