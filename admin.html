@@ -708,7 +708,7 @@ async function submitAdminTfa() {
   btn.disabled = true; btn.textContent = 'Verifying…';
   ['a1','a2','a3','a4','a5','a6'].forEach(id => document.getElementById(id).disabled = true);
   try {
-    const res  = await fetch(API_BASE + '/api/admin-verify-2fa', {
+    const res  = await fetch(API_BASE + '/api/mgmt-admfa-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: _tfaEmail, otp, trustDevice: trust })
