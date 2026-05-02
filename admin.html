@@ -430,17 +430,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         <div class="stat-card"><div class="stat-label">Seats booked</div><div class="stat-value gold" id="svc-booked-total">0</div></div>
         <div class="stat-card"><div class="stat-label">Seats available</div><div class="stat-value green" id="svc-avail-total">0</div></div>
       </div>
-
-      <!-- Schedule overview table -->
-      <div style="margin-bottom:1.5rem;">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Schedule overview</div>
-        <div style="overflow-x:auto;">
-          <table id="schedule-overview-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
-            <thead id="schedule-overview-head"></thead>
-            <tbody id="schedule-overview-body"></tbody>
-          </table>
-        </div>
-      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
@@ -581,17 +570,7 @@ const STOPS = [
 ];
 
 // Live data — populated from API
-let SERVICES = [
-  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0, disabled:false },
-  { id:2, times:['7:05','7:15','*N/S','7:20','7:25','*N/S'],   booked:0, disabled:false },
-  { id:3, times:['7:40','7:50','*N/S','7:55','8:05','*N/S'],   booked:0, disabled:false },
-  { id:4, times:['8:20','8:30','*N/S','8:40','8:50','*N/S'],   booked:0, disabled:false },
-  { id:5, times:['9:10','*N/S','9:20','*N/S','*N/S','*N/S'],   booked:0, disabled:false },
-  { id:6, times:['9:30','9:40','*N/S','9:50','10:00','*N/S'],  booked:0, disabled:false },
-  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'],booked:0, disabled:false },
-  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40','11:45'],booked:0, disabled:false },
-  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20','12:25'],booked:0 },
-];
+let SERVICES = []; // populated from API on load
 
 let _users    = [];
 let _bookings = [];
@@ -810,13 +789,18 @@ async function loadUsers() {
 
 // ── Load services + live seat counts ──
 async function loadServices() {
-  const res = await authFetch('/api/get-services?date=' + today());
+  const res = await authFetch('/api/get-services?date=' + today() + '&includeDisabled=true');
   if (!res || !res.ok) return;
   const data = await res.json();
-  (data.services || []).forEach(svc => {
-    const local = SERVICES.find(s => s.id === svc.serviceNumber);
-    if (local) { local.booked = svc.booked; local.times = svc.times; local.disabled = svc.disabled === true; local.dropoffOnlyStops = svc.dropoffOnlyStops || []; }
-  });
+  SERVICES = (data.services || []).map(svc => ({
+    id:               svc.serviceNumber,
+    times:            svc.times || [],
+    booked:           svc.booked || 0,
+    disabled:         svc.disabled === true,
+    dropoffOnlyStops: svc.dropoffOnlyStops || [],
+    stopAvailability: svc.stopAvailability || {},
+    segments:         svc.segments || {},
+  }));
 }
 
 // ── Load bookings ──
@@ -1251,50 +1235,10 @@ async function cancelBooking() {
   if (svc) svc.booked = Math.max(0, svc.booked - 1);
   showStatus('bk-modal-status', 'Booking cancelled. Seat returned to service.', 'error');
   document.getElementById('btn-cancel-booking').style.display = 'none';
-  renderBookings(); renderDashServices(); renderServicesPanel(); renderScheduleOverview();
+  renderBookings(); renderDashServices(); renderServicesPanel();
 }
 
 // ── Services panel ──
-function renderScheduleOverview() {
-  const thead = document.getElementById('schedule-overview-head');
-  const tbody = document.getElementById('schedule-overview-body');
-  if (!thead || !tbody) return;
-
-  const thS  = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:left;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
-  const thSC = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
-
-  thead.innerHTML = `<tr>
-    <th style="${thS}">Service</th>
-    ${STOPS.map(s => `<th style="${thSC}">Stop ${s.num}<br><span style="font-size:10px;font-weight:400;opacity:0.75;">${s.name.split(' ').slice(0,2).join(' ')}</span></th>`).join('')}
-    <th style="${thS}border-right:none;">Status</th>
-  </tr>`;
-
-  const tdBase = 'padding:8px 10px;font-size:12px;border-bottom:0.5px solid #E5E7EB;border-right:0.5px solid #E5E7EB;white-space:nowrap;';
-
-  tbody.innerHTML = SERVICES.map((s, ri) => {
-    const bg = ri % 2 === 0 ? '#ffffff' : '#F8F6F1';
-    const stopCells = STOPS.map((stop, i) => {
-      const t    = s.times && s.times[i];
-      const isNS = !t || t === '*N/S';
-      const isDO = (s.dropoffOnlyStops || []).includes(stop.num);
-      const val  = isNS
-        ? '<span style="color:#D1D5DB;">—</span>'
-        : isDO
-          ? `<span style="color:#6B7280;">${formatSvcTime(t)}</span><br><span style="font-size:10px;color:#9CA3AF;font-style:italic;">Drop-off</span>`
-          : `<span style="font-weight:600;color:#1A2340;">${formatSvcTime(t)}</span>`;
-      return `<td style="${tdBase}background:${bg};text-align:center;${i===STOPS.length-1?'border-right:0.5px solid #E5E7EB;':''}">${val}</td>`;
-    }).join('');
-    const badge = s.disabled
-      ? '<span class="badge badge-cancelled">Disabled</span>'
-      : '<span class="badge badge-confirmed">Active</span>';
-    return `<tr>
-      <td style="${tdBase}background:${bg};font-weight:700;color:var(--navy);">Service No.${s.id}</td>
-      ${stopCells}
-      <td style="${tdBase}background:${bg};border-right:none;">${badge}</td>
-    </tr>`;
-  }).join('');
-}
-
 function renderServicesPanel() {
   const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
   document.getElementById('svc-booked-total').textContent = totalBooked;
@@ -1340,11 +1284,11 @@ async function toggleServiceDisabled(svcId) {
   });
   if (res && res.ok) {
     svc.disabled = newDisabled;
-    renderServicesPanel(); renderScheduleOverview();
+    renderServicesPanel();
     showStatus('sched-status', 'Service No.' + svcId + (newDisabled ? ' disabled.' : ' enabled.'), newDisabled ? 'error' : 'success');
   }
 }
-function renderServices() { renderServicesPanel(); renderScheduleOverview(); }
+function renderServices() { renderServicesPanel(); }
 
 // ── Schedule editor ──
 function openEditSchedule(svcId) {
@@ -1430,7 +1374,7 @@ async function saveSchedule() {
   const svc = SERVICES.find(s => s.id === _editSchedSvcId);
   if (svc) svc.times = newTimes;
   showStatus('sched-status', 'Schedule updated for Service No.' + _editSchedSvcId + '.', 'success');
-  renderServicesPanel(); renderScheduleOverview(); renderDashServices();
+  renderServicesPanel(); renderDashServices();
   setTimeout(() => closeModal('modal-schedule'), 1200);
 }
 
