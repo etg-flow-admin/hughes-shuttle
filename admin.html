@@ -744,7 +744,7 @@ async function init() {
 async function loadDashboard() {
   setAdminAvatar();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  // No default date filter — show all bookings
+  // No default date — show all bookings
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
@@ -1092,6 +1092,7 @@ async function submitAddUser() {
 
 // ── Bookings ──
 async function reloadBookings() {
+  window._bkPage = 1;
   const dateF = document.getElementById('booking-date-filter').value;
   const svcF  = document.getElementById('booking-svc-filter').value;
   const stF   = document.getElementById('booking-status-filter').value;
@@ -1109,26 +1110,14 @@ function renderBookings() {
     (stF  === 'all' || b.status === stF)
   );
   document.getElementById('booking-count').textContent = bks.length + ' booking' + (bks.length !== 1 ? 's' : '');
-  window._bkPage = window._bkPage || 1;
+  if (!window._bkPage) window._bkPage = 1;
+  const BK_PAGE_SIZE = 20;
+  const bkTotalPages = Math.ceil(bks.length / BK_PAGE_SIZE);
+  if (window._bkPage > bkTotalPages) window._bkPage = 1;
+  bks = bks.slice((window._bkPage - 1) * BK_PAGE_SIZE, window._bkPage * BK_PAGE_SIZE);
   const tbody = document.getElementById('booking-tbody');
   if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found.</td></tr>'; return; }
-  // Pagination — 20 per page
-  const PAGE_SIZE = 20;
-  const totalPages = Math.ceil(bks.length / PAGE_SIZE);
-  if (!window._bkPage || window._bkPage > totalPages) window._bkPage = 1;
-  const pageBks = bks.slice((window._bkPage - 1) * PAGE_SIZE, window._bkPage * PAGE_SIZE);
-
-  // Render pagination controls
-  let pagHtml = '';
-  if (totalPages > 1) {
-    pagHtml = '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:0.75rem;font-size:13px;">';
-    pagHtml += `<span style="color:var(--muted);">Page ${window._bkPage} of ${totalPages}</span>`;
-    if (window._bkPage > 1) pagHtml += `<button class="btn btn-outline btn-sm" onclick="window._bkPage--;renderBookings()">&#8249; Prev</button>`;
-    if (window._bkPage < totalPages) pagHtml += `<button class="btn btn-outline btn-sm" onclick="window._bkPage++;renderBookings()">Next &#8250;</button>`;
-    pagHtml += '</div>';
-  }
-
-  tbody.innerHTML = pageBks.map(b => `<tr>
+  tbody.innerHTML = bks.map(b => `<tr>
     <td><span class="ref-code">${b.ref}</span></td>
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
@@ -1139,17 +1128,18 @@ function renderBookings() {
     <td class="muted">${b.bookedAt}</td>
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
-  // Append pagination
-  const pagDiv = document.createElement('div');
-  pagDiv.innerHTML = pagHtml;
-  const wrap = document.getElementById('booking-tbody')?.closest('.table-wrap');
-  const existing = wrap?.parentElement?.querySelector('.bk-pagination');
-  if (existing) existing.remove();
-  if (pagHtml && wrap) {
-    const pd = document.createElement('div');
-    pd.className = 'bk-pagination';
-    pd.innerHTML = pagHtml;
-    wrap.parentElement.appendChild(pd);
+
+  // Render pagination
+  const bkExistingPag = document.getElementById('bk-pagination');
+  if (bkExistingPag) bkExistingPag.remove();
+  if (bkTotalPages > 1) {
+    const pag = document.createElement('div');
+    pag.id = 'bk-pagination';
+    pag.style.cssText = 'display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:0.75rem;font-size:13px;';
+    pag.innerHTML = `<span style="color:var(--muted);">Page ${window._bkPage} of ${bkTotalPages}</span>` +
+      (window._bkPage > 1 ? `<button class="btn btn-outline btn-sm" onclick="window._bkPage--;renderBookings()">&#8249; Prev</button>` : '') +
+      (window._bkPage < bkTotalPages ? `<button class="btn btn-outline btn-sm" onclick="window._bkPage++;renderBookings()">Next &#8250;</button>` : '');
+    document.getElementById('booking-tbody').closest('.table-wrap').after(pag);
   }
 }
 
