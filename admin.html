@@ -438,13 +438,10 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
           <tbody id="svc-tbody"></tbody>
         </table>
       </div>
-    </div>
+    
 
-  </main>
-
-
-    <!-- ── Stop descriptions ── -->
-    <div style="margin-top:2rem;">
+    <!-- Stop descriptions — only shown in Manage Services panel -->
+    <div style="margin-top:2rem;padding:0 1.5rem 1.5rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
         <div>
           <div class="page-title" style="font-size:16px;">Stop descriptions</div>
@@ -466,6 +463,9 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         </table>
       </div>
     </div>
+  </div>
+
+  </main>
 </div>
 
 <!-- ════ EDIT USER MODAL ════ -->
@@ -771,6 +771,7 @@ async function loadDashboard() {
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
+  if (document.getElementById('panel-services')?.classList.contains('active')) loadStops();
   await loadBookings();
   updateBadges();
   renderDashServices();
@@ -884,7 +885,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
 }
 
 // ── Dashboard services ──
@@ -1153,7 +1154,6 @@ function renderBookings() {
     <td class="muted">${b.bookedAt}</td>
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
-
   const bkExPag = document.getElementById('bk-pagination');
   if (bkExPag) bkExPag.remove();
   if (bkTotalPages > 1) {
