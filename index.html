@@ -478,7 +478,12 @@ function seatsLeft(svc)  { return CAP - svc.booked; }
 function status(s)       { return s === 0 ? 'full' : s <= 3 ? 'low' : 'ok'; }
 function pillCls(st)     { return st === 'full' ? 'pill-full' : st === 'low' ? 'pill-low' : 'pill-ok'; }
 function barCls(st)      { return st === 'full' ? 'bar-full'  : st === 'low' ? 'bar-low'  : 'bar-ok'; }
-function pillLbl(s)      { return s === 0 ? 'Full' : s === 1 ? '1 seat left' : s + ' seats left'; }
+function pillLbl(s) {
+  if (s === 0)  return 'Full';
+  if (s <= 6)   return 'Limited seats remaining';
+  if (s <= 14)  return 'Seats filling up';
+  return 'Plenty of seats available';
+}
 
 
 // Format time: "7:05" → "07:05 am", "13:00" → "01:00 pm"
@@ -527,15 +532,13 @@ function renderServices() {
   const fStop = document.getElementById('stopFilter').value;
   const grid  = document.getElementById('serviceGrid');
   grid.innerHTML = '';
-  // Remove any injected booking forms
   document.querySelectorAll('.booking-form-injected').forEach(el => el.remove());
 
-  const _dateCheck = document.getElementById('dateInput').value;
-  if (_dateCheck && isWeekend(_dateCheck)) {
+  const _dc = document.getElementById('dateInput').value;
+  if (_dc && isWeekend(_dc)) {
     grid.innerHTML = '<div style="text-align:center;padding:2rem 1rem;font-size:14px;color:var(--h-muted);background:var(--h-white);border-radius:9px;border:0.5px solid var(--h-border-sub);">Services are not available on weekends.</div>';
     return;
   }
-
   SERVICES.forEach(svc => {
     if (svc.disabled) return;
     const visible = fStop === 'all'
@@ -577,7 +580,6 @@ function renderServices() {
       <div class="svc-stops">${stopRows}</div>
       <div class="svc-footer">
         <span class="seat-pill ${pillCls(st)}">${pillLbl(left)}</span>
-        <div class="bar-wrap"><div class="bar-fill ${barCls(st)}" style="width:${pct}%"></div></div>
       </div>`;
     grid.appendChild(card);
   });
@@ -640,12 +642,15 @@ function onAlightingSelected() {
     window._selectedAlight = null;
     return;
   }
-  const svc    = window._selectedSvc;
-  const alight = STOPS[alightNum - 1];
+  const svc      = window._selectedSvc;
+  const alight   = STOPS[alightNum - 1];
+  const boardNum = window._selectedStop.num;
   document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;
   window._selectedAlight = alight;
-  const avail = (svc.stopAvailability || {})[window._selectedStop.num] ?? (CAP - svc.booked);
-  document.getElementById('sumSeats').textContent = avail + ' of ' + CAP + ' available';
+  // Use live stopAvailability from API — reflects actual segment occupancy
+  const stopAvail = svc.stopAvailability || {};
+  const avail = (stopAvail[boardNum] !== undefined) ? +stopAvail[boardNum] : Math.max(0, CAP - svc.booked);
+  document.getElementById('sumSeats').textContent = avail + ' seat' + (avail !== 1 ? 's' : '') + ' available for your journey';
   document.getElementById('sumSeatsRow').style.display = '';
   if (btn) { btn.style.opacity='1'; btn.style.pointerEvents=''; btn.textContent='Confirm booking'; }
 }
@@ -683,9 +688,7 @@ function cancelBooking() {
   document.querySelectorAll('.booking-form-injected').forEach(el => el.remove());
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
-  window._selectedAlight = null;
-  window._selectedSvc    = null;
-  window._selectedStop   = null;
+  window._selectedAlight = null; window._selectedSvc = null; window._selectedStop = null;
 }
 
 function switchTab(t) {
@@ -1269,7 +1272,6 @@ async function loadMyBookings() {
       if (a.cancelled !== b.cancelled) return a.cancelled ? 1 : -1;
       return 0;
     });
-    // Default to next week if today is weekend
     if (!_myAnchor) {
       _myAnchor = isWeekend(_localTodayStr) ? getMondayOf(nextWeekday(_localTodayStr)) : getMondayOf(_localTodayStr);
     }
@@ -1450,10 +1452,8 @@ function prevWeekday(isoStr) {
 function updateServiceDateLabel(isoStr) {
   const el = document.getElementById('serviceDateLabel');
   if (!el || !isoStr) return;
-  const d = new Date(isoStr + 'T12:00');
-  el.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  el.textContent = new Date(isoStr + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
-
 const _startDate = isWeekend(_localTodayStr) ? nextWeekday(_localTodayStr) : _localTodayStr;
 document.getElementById('dateInput').value = _startDate;
 // Restrict booking to 7 days in advance
