@@ -42,6 +42,12 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
       context.res = { status: 400, body: { error: 'Bookings can only be made up to 7 days in advance.' } }; return;
     }
 
+    // Block weekends
+    const travelDay = travel.getDay();
+    if (travelDay === 0 || travelDay === 6) {
+      context.res = { status: 400, body: { error: 'Bookings are not available on weekends.' } }; return;
+    }
+
     // Check duplicate booking
     const existing = await getListItem(
       'ShuttleBookings',
