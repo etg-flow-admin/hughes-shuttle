@@ -19,7 +19,7 @@ const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 const LIST_FIELDS = {
   ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt,TwoFactorCode,TwoFactorExpiry,TrustedDevices',
   ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,AlightingStop,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
-  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,DropoffOnlyStops,UpdatedAt',
+  ShuttleServices: 'id,Title,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,DropoffOnlyStops,UpdatedAt',
 };
 
 let _tokenCache = { token: null, expiry: 0 };

@@ -17,7 +17,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
   try {
     const scheduleItems = await getListItems(
       'ShuttleServices', '',
-      'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,DropoffOnlyStops',
+      'ID,Title,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,DropoffOnlyStops',
       20
     );
 
@@ -50,6 +50,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
           return {
             id:               svcNum,
             serviceNumber:    svcNum,
+            title:            s.Title || ('Service No.' + svcNum),
             times,
             booked:           avail.maxOnBoard || 0,
             seatsLeft:        Math.max(0, CAPACITY - (avail.maxOnBoard || 0)),
