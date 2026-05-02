@@ -440,7 +440,10 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       </div>
     </div>
 
-    <!-- ── Stop descriptions editor ── -->
+  </main>
+
+
+    <!-- ── Stop descriptions ── -->
     <div style="margin-top:2rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
         <div>
@@ -463,7 +466,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         </table>
       </div>
     </div>
-  </main>
 </div>
 
 <!-- ════ EDIT USER MODAL ════ -->
@@ -767,7 +769,7 @@ async function init() {
 async function loadDashboard() {
   setAdminAvatar();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  // No default date — show all bookings
+  // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
@@ -882,7 +884,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
 }
 
 // ── Dashboard services ──
