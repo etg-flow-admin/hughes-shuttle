@@ -661,11 +661,12 @@ function onAlightingSelected() {
   window._selectedAlight = alight;
 
   // Calculate availability for exact segment range boardNum → alightNum-1
-  // Max occupancy across only the segments this student will occupy
+  // segments keys may be numbers or strings depending on API
   const segments = svc.segments || {};
   let maxOccupancy = 0;
   for (let s = boardNum; s < alightNum; s++) {
-    maxOccupancy = Math.max(maxOccupancy, segments[s] || 0);
+    const val = segments[s] !== undefined ? segments[s] : (segments[String(s)] !== undefined ? segments[String(s)] : 0);
+    maxOccupancy = Math.max(maxOccupancy, +val || 0);
   }
   const avail = Math.max(0, CAP - maxOccupancy);
 
@@ -1204,6 +1205,7 @@ async function loadServices() {
         if (svc.times && svc.times.length >= 6) local.times = svc.times;
         local.disabled = svc.disabled === true;
         local.stopAvailability = svc.stopAvailability || {};
+        local.segments         = svc.segments || {};
         local.dropoffOnlyStops = svc.dropoffOnlyStops || [];
       }
     });
