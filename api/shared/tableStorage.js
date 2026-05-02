@@ -6,12 +6,11 @@
 
 const { TableClient, TableServiceClient } = require('@azure/data-tables');
 const { getSecret } = require('./keyVault');
+const { isSandboxRequest, requestContext } = require('./msLists');
 
-const isSandbox  = process.env.ENVIRONMENT === 'sandbox';
-const TABLE_NAME = isSandbox
-  ? (process.env.SEGMENTS_TABLE_NAME_SANDBOX || 'ShuttleSegmentsSandbox')
-  : (process.env.SEGMENTS_TABLE_NAME         || 'ShuttleSegments');
-const CAPACITY   = 22;
+const PROD_TABLE    = process.env.SEGMENTS_TABLE_NAME         || 'ShuttleSegments';
+const SANDBOX_TABLE = process.env.SEGMENTS_TABLE_NAME_SANDBOX || 'ShuttleSegmentsSandbox';
+const CAPACITY      = 22;
 
 let _connStr = null;
 async function getConnStr() {
@@ -20,16 +19,20 @@ async function getConnStr() {
   return _connStr;
 }
 
-async function getClient() {
-  const conn = await getConnStr();
-  return TableClient.fromConnectionString(conn, TABLE_NAME);
+function getTableName(req) {
+  return isSandboxRequest(req || requestContext.getStore()) ? SANDBOX_TABLE : PROD_TABLE;
 }
 
-async function ensureTable() {
+async function getClient(req) {
+  const conn = await getConnStr();
+  return TableClient.fromConnectionString(conn, getTableName(req));
+}
+
+async function ensureTable(req) {
   const conn = await getConnStr();
   try {
     const svc = TableServiceClient.fromConnectionString(conn);
-    await svc.createTable(TABLE_NAME);
+    await svc.createTable(getTableName(req));
   } catch (e) {
     if (!e.message?.includes('TableAlreadyExists')) throw e;
   }
@@ -37,8 +40,8 @@ async function ensureTable() {
 
 // ── Get all segment counts for a service on a date ──
 // Returns object: { stopNum: onBoard, ... }
-async function getServiceSegments(travelDate, serviceNumber) {
-  const client  = getClient();
+async function getServiceSegments(travelDate, serviceNumber, req) {
+  const client  = await getClient(req);
   const pk      = travelDate;
   const prefix  = `${serviceNumber}-`;
   const result  = {};
@@ -54,8 +57,8 @@ async function getServiceSegments(travelDate, serviceNumber) {
 
 // ── Get availability for a date — all services ──
 // Returns: { serviceNumber: { segments: {stopNum: onBoard}, maxOnBoard, seatsLeft } }
-async function getAvailabilityForDate(travelDate) {
-  const client = getClient();
+async function getAvailabilityForDate(travelDate, req) {
+  const client = await getClient(req);
   const iter   = client.listEntities({ queryOptions: {
     filter: `PartitionKey eq '${travelDate}'`
   }});
@@ -83,8 +86,8 @@ async function getAvailabilityForDate(travelDate) {
 // ── Get per-stop availability for a specific service ──
 // Returns: { stopNum: seatsAvailableIfBoardingHere }
 // "seats available if boarding at stop N riding to last stop"
-async function getStopAvailability(travelDate, serviceNumber, activeStops) {
-  const segments = await getServiceSegments(travelDate, serviceNumber);
+async function getStopAvailability(travelDate, serviceNumber, activeStops, req) {
+  const segments = await getServiceSegments(travelDate, serviceNumber, req);
   const result   = {};
   const lastStop  = Math.max(...activeStops);
   for (const stop of activeStops) {
@@ -101,8 +104,8 @@ async function getStopAvailability(travelDate, serviceNumber, activeStops) {
 // ── Book a seat: A → B ──
 // Atomically increments segments A, A+1, ... B-1
 // Uses optimistic concurrency with ETags per entity
-async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) {
-  await ensureTable();
+async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop, req) {
+  await ensureTable(req);
   const client = getClient();
   const pk     = travelDate;
 
@@ -167,8 +170,8 @@ async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) 
 
 // ── Cancel a seat: A → B ──
 // Decrements segments A, A+1, ... B-1 (floor at 0)
-async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop) {
-  const client = getClient();
+async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop, req) {
+  const client = await getClient(req);
   const pk     = travelDate;
 
   const segStops = [];

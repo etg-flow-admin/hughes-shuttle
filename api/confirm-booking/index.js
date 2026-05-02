@@ -58,14 +58,14 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
     }
 
     // Get departure time from ShuttleServices
-    const svcItem    = await getListItem('ShuttleServices', `ServiceNumber eq ${serviceNumber}`);
+    const svcItem    = await getListItem('ShuttleServices', `ServiceNumber eq ${serviceNumber}`, req);
     const stopKey    = `Stop${boardingStop}Time`;
     const depTime    = svcItem ? (svcItem[stopKey] || '—') : '—';
     const boarding   = STOPS[+boardingStop - 1] || { name: `Stop ${boardingStop}` };
     const alighting  = STOPS[+alightingStop - 1] || { name: `Stop ${alightingStop}` };
 
     // Atomic segment booking
-    const result = await bookSeat(travelDate, serviceNumber, +boardingStop, +alightingStop);
+    const result = await bookSeat(travelDate, serviceNumber, +boardingStop, +alightingStop, req);
 
     if (!result.success) {
       const msg = result.reason === 'full'
@@ -79,7 +79,7 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
 
     let roomNumber = '';
     try {
-      const userRecord = await getListItem('ShuttleUsers', `Title eq '${email}'`);
+      const userRecord = await getListItem('ShuttleUsers', `Title eq '${email}'`, req);
       roomNumber = userRecord?.RoomNumber || '';
     } catch (e) { /* non-fatal */ }
 

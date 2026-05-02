@@ -1,18 +1,36 @@
-// api/shared/msLists.js
 const fetch = require('node-fetch');
+const { AsyncLocalStorage } = require('async_hooks');
+
+const requestContext = new AsyncLocalStorage();
 
 const TENANT_ID  = process.env.SHAREPOINT_TENANT_ID;
 const CLIENT_ID  = process.env.SHAREPOINT_CLIENT_ID;
 const SITE_ID    = 'equitytransportgroup.sharepoint.com,7d2ff47a-ce6d-480d-ba80-0338c1eece11,0908d58e-4a2a-4a75-b2c2-6b1aefb88c5c';
 
-const isSandbox = process.env.ENVIRONMENT === 'sandbox';
+const PROD_ORIGINS = ['https://book.hughesshuttle.com.au'];
 
-const LIST_IDS = {
-  ShuttleUsers:    isSandbox ? process.env.SHAREPOINT_LIST_USERS_SANDBOX    : process.env.SHAREPOINT_LIST_USERS,
-  ShuttleBookings: isSandbox ? process.env.SHAREPOINT_LIST_BOOKINGS_SANDBOX : process.env.SHAREPOINT_LIST_BOOKINGS,
-  ShuttleServices: isSandbox ? process.env.SHAREPOINT_LIST_SERVICES_SANDBOX : process.env.SHAREPOINT_LIST_SERVICES,
-};
+function isSandboxRequest(req) {
+  // Check explicit req first, then fall back to AsyncLocalStorage context
+  const r = req || requestContext.getStore();
+  if (!r) return false;
+  const origin = (r.headers && (r.headers.origin || r.headers.Origin || r.headers.referer || r.headers.Referer)) || '';
+  if (!origin) return false;
+  return !PROD_ORIGINS.some(o => origin.startsWith(o));
+}
 
+// Call this at the start of each function handler to set request context
+function setRequestContext(req) {
+  return requestContext.run(req, () => {});
+}
+
+function getListIds(req) {
+  const sandbox = isSandboxRequest(req);
+  return {
+    ShuttleUsers:    sandbox ? process.env.SHAREPOINT_LIST_USERS_SANDBOX    : process.env.SHAREPOINT_LIST_USERS,
+    ShuttleBookings: sandbox ? process.env.SHAREPOINT_LIST_BOOKINGS_SANDBOX : process.env.SHAREPOINT_LIST_BOOKINGS,
+    ShuttleServices: sandbox ? process.env.SHAREPOINT_LIST_SERVICES_SANDBOX : process.env.SHAREPOINT_LIST_SERVICES,
+  };
+}
 const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 
 const LIST_FIELDS = {
@@ -41,15 +59,16 @@ async function getGraphToken() {
   return data.access_token;
 }
 
-function getListId(listName) {
-  const id = LIST_IDS[listName];
+function getListId(listName, req) {
+  const ids = getListIds(req || requestContext.getStore());
+  const id  = ids[listName];
   if (!id) throw new Error(`List ID not configured for '${listName}'. Check SHAREPOINT_LIST_* app settings.`);
   return id;
 }
 
-async function getListItems(listName, filter = '', select = '', top = 500) {
+async function getListItems(listName, filter = '', select = '', top = 500, req = null) {
   const token  = await getGraphToken();
-  const listId = getListId(listName);
+  const listId = getListId(listName, req);
   const fields = select || LIST_FIELDS[listName] || '';
   const expand = fields ? `fields($select=${fields})` : 'fields';
   const graphFilter = filter ? filter.replace(/(\w+)\s+(eq|ne|lt|gt|le|ge|startswith)/gi, 'fields/$1 $2') : '';
@@ -67,14 +86,14 @@ async function getListItems(listName, filter = '', select = '', top = 500) {
   return (data.value || []).map(item => ({ ID: item.id, ...item.fields }));
 }
 
-async function getListItem(listName, filter) {
-  const items = await getListItems(listName, filter, '', 1);
+async function getListItem(listName, filter, req = null) {
+  const items = await getListItems(listName, filter, '', 1, req);
   return items[0] || null;
 }
 
-async function createListItem(listName, fields) {
+async function createListItem(listName, fields, req = null) {
   const token  = await getGraphToken();
-  const listId = getListId(listName);
+  const listId = getListId(listName, req);
   const url    = `${GRAPH_BASE}/${listId}/items`;
   const res    = await fetch(url, {
     method:  'POST',
@@ -86,9 +105,9 @@ async function createListItem(listName, fields) {
   return { ID: data.id, ...data.fields };
 }
 
-async function updateListItem(listName, itemId, fields) {
+async function updateListItem(listName, itemId, fields, req = null) {
   const token  = await getGraphToken();
-  const listId = getListId(listName);
+  const listId = getListId(listName, req);
   const url    = `${GRAPH_BASE}/${listId}/items/${itemId}/fields`;
   const res    = await fetch(url, {
     method:  'PATCH',
@@ -102,4 +121,4 @@ async function updateListItem(listName, itemId, fields) {
   return true;
 }
 
-module.exports = { getListItems, getListItem, createListItem, updateListItem };
+module.exports = { getListItems, getListItem, createListItem, updateListItem, isSandboxRequest, setRequestContext, requestContext };

@@ -38,7 +38,7 @@ module.exports = wrapHandler('cancel-booking', async function (context, req) {
 
     // Free segments if we have valid stop data
     if (boardingStop && alightingStop && boardingStop < alightingStop) {
-      await cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop);
+      await cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop, req);
     }
 
     context.log.info(`cancel-booking: ${ref} cancelled by ${payload.email}`);

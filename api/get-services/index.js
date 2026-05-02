@@ -20,11 +20,11 @@ module.exports = wrapHandler('get-services', async function (context, req) {
     const scheduleItems = await getListItems(
       'ShuttleServices', '',
       'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled',
-      20
+      20, req
     );
 
     // Get all segment data for this date in one query
-    const availability = await getAvailabilityForDate(travelDate);
+    const availability = await getAvailabilityForDate(travelDate, req);
 
     const services = await Promise.all(
       scheduleItems
@@ -49,7 +49,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
 
           // Per-stop availability
           const avail      = availability[svcNum] || { segments: {}, maxOnBoard: 0 };
-          const stopAvail  = await getStopAvailability(travelDate, svcNum, activeStops);
+          const stopAvail  = await getStopAvailability(travelDate, svcNum, activeStops, req);
 
           return {
             id:            svcNum,
