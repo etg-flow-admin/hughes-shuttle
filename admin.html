@@ -269,20 +269,12 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value red" id="ds-cancelled">—</div></div>
       </div>
 
-      <!-- Service snapshot with date picker -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.05em;">Services</div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button onclick="shiftDashDate(-1)" style="background:var(--navy);color:var(--gold);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;cursor:pointer;font-family:inherit;">&#8249;</button>
-          <input type="date" id="dash-svc-date" style="font-size:12px;padding:5px 8px;border-radius:6px;border:0.5px solid var(--border);background:var(--white);color:var(--navy);font-family:inherit;cursor:pointer;" onchange="loadDashServices()">
-          <button onclick="shiftDashDate(1)" style="background:var(--navy);color:var(--gold);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;cursor:pointer;font-family:inherit;">&#8250;</button>
-        </div>
-      </div>
-      <div id="dash-weekend-msg" style="display:none;text-align:center;padding:1.5rem;font-size:13px;color:var(--muted);background:var(--white);border-radius:8px;border:0.5px solid var(--border);">No services on weekends.</div>
-      <div class="table-wrap" id="dash-svc-table-wrap">
+      <!-- Today's service snapshot -->
+      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Today's services</div>
+      <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Service</th><th>First departure</th><th style="min-width:220px;">Stops</th><th style="text-align:center;">Booked</th><th style="text-align:center;">Available</th><th>Status</th>
+            <th>Service</th><th>First departure</th><th>Booked</th><th>Available</th><th>Status</th>
           </tr></thead>
           <tbody id="dash-services-body"></tbody>
         </table>
@@ -420,7 +412,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Date</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
+            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
           </tr></thead>
           <tbody id="booking-tbody"></tbody>
         </table>
@@ -437,6 +429,17 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         <div class="stat-card"><div class="stat-label">Total capacity</div><div class="stat-value">198</div></div>
         <div class="stat-card"><div class="stat-label">Seats booked</div><div class="stat-value gold" id="svc-booked-total">0</div></div>
         <div class="stat-card"><div class="stat-label">Seats available</div><div class="stat-value green" id="svc-avail-total">0</div></div>
+      </div>
+
+      <!-- Schedule overview table -->
+      <div style="margin-bottom:1.5rem;">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Schedule overview</div>
+        <div style="overflow-x:auto;">
+          <table id="schedule-overview-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
+            <thead id="schedule-overview-head"></thead>
+            <tbody id="schedule-overview-body"></tbody>
+          </table>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -776,13 +779,12 @@ async function init() {
 
 async function loadDashboard() {
   setAdminAvatar();
-  const _dsdEl = document.getElementById('dash-svc-date'); if (_dsdEl) _dsdEl.value = today();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
-  loadDashServices();
+  renderDashServices();
 }
 
 // ── Load users ──
@@ -808,7 +810,7 @@ async function loadUsers() {
 
 // ── Load services + live seat counts ──
 async function loadServices() {
-  const res = await authFetch('/api/get-services?date=' + today() + '&includeDisabled=true');
+  const res = await authFetch('/api/get-services?date=' + today());
   if (!res || !res.ok) return;
   const data = await res.json();
   (data.services || []).forEach(svc => {
@@ -897,73 +899,21 @@ function switchPanel(key) {
 }
 
 // ── Dashboard services ──
-function shiftDashDate(days) {
-  const el = document.getElementById('dash-svc-date');
-  if (!el) return;
-  const d = el.value ? new Date(el.value + 'T12:00') : new Date();
-  d.setDate(d.getDate() + days);
-  el.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  loadDashServices();
-}
-
-async function loadDashServices() {
-  const dateEl    = document.getElementById('dash-svc-date');
-  const date      = dateEl?.value || today();
-  const wkndMsg   = document.getElementById('dash-weekend-msg');
-  const tableWrap = document.getElementById('dash-svc-table-wrap');
-  const d = new Date(date + 'T12:00');
-  if (d.getDay() === 0 || d.getDay() === 6) {
-    if (wkndMsg) wkndMsg.style.display = '';
-    if (tableWrap) tableWrap.style.display = 'none';
-    return;
-  }
-  if (wkndMsg) wkndMsg.style.display = 'none';
-  if (tableWrap) tableWrap.style.display = '';
+function renderDashServices() {
   const tbody = document.getElementById('dash-services-body');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--muted);">Loading…</td></tr>';
-  try {
-    const res  = await authFetch('/api/get-services?date=' + date);
-    const data = res && res.ok ? await res.json() : null;
-    if (!data || !data.services) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1rem;">No data.</td></tr>'; return; }
-    const svcs = data.services;
-    tbody.innerHTML = svcs.map(s => {
-      const segments  = s.segments || {};
-      const stopAvail = s.stopAvailability || {};
-      const dropoff   = s.dropoffOnlyStops || [];
-      const activeStops = s.times.map((t,i) => t !== '*N/S' ? i+1 : null).filter(Boolean);
-      const firstTime = s.times.find(t => t !== '*N/S') || '—';
-      const maxBooked = activeStops.length > 1
-        ? Math.max(...Object.values(segments).map(v => +v || 0), 0)
-        : (s.booked || 0);
-      const left = Math.max(0, CAP - maxBooked);
-      const full = left === 0, low = left <= 3 && !full;
-      const stopRows = activeStops.map(num => {
-        const t      = s.times[num-1];
-        const isDO   = dropoff.includes(num);
-        const avail  = stopAvail[num] !== undefined ? +stopAvail[num] : left;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;border-bottom:0.5px solid var(--border);gap:6px;">
-          <span style="color:var(--muted);flex-shrink:0;">Stop ${num}</span>
-          <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${STOPS[num-1]?.name||''}</span>
-          ${isDO ? '<span style="color:var(--muted);font-style:italic;flex-shrink:0;">Drop-off</span>'
-                 : `<span style="flex-shrink:0;">${formatSvcTime(t)}</span>
-                    <span style="flex-shrink:0;font-weight:600;color:${avail<=3?'#A32D2D':'#3B6D11'};">${avail} left</span>`}
-        </div>`;
-      }).join('');
-      return `<tr>
-        <td><strong>Service No.${s.id}</strong></td>
-        <td>${formatSvcTime(firstTime)}</td>
-        <td style="min-width:220px;">${stopRows}</td>
-        <td style="text-align:center;font-weight:700;">${maxBooked}</td>
-        <td style="text-align:center;font-weight:700;color:${full?'#A32D2D':low?'#B85C00':'#3B6D11'};">${left}</td>
-        <td><span class="badge ${full?'badge-cancelled':low?'badge-pending':'badge-confirmed'}">${full?'Full':low?'Low':'Available'}</span></td>
-      </tr>`;
-    }).join('');
-    const totalBooked = svcs.reduce((a,s) => a + Math.max(...Object.values(s.segments||{0:0}).map(v=>+v||0)), 0);
-    const el = document.getElementById('ds-seats');
-    if (el) el.textContent = totalBooked + ' / ' + (CAP * svcs.length);
-  } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1rem;">Failed to load.</td></tr>';
-  }
+  tbody.innerHTML = SERVICES.map(s => {
+    const left = CAP - s.booked;
+    const full = left === 0, low = left <= 3 && !full;
+    return `<tr>
+      <td><strong>Service No.${s.id}</strong></td>
+      <td>${s.times.find(t => t !== '*N/S') || '—'}</td>
+      <td>${s.booked} / ${CAP}</td>
+      <td>${left}</td>
+      <td><span class="badge ${full?'badge-cancelled':low?'badge-pending':'badge-confirmed'}">${full?'Full':low?'Low':'Available'}</span></td>
+    </tr>`;
+  }).join('');
+  const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
+  document.getElementById('ds-seats').textContent = totalBooked + ' / ' + (CAP * 9);
 }
 
 // ── Users ──
@@ -1208,7 +1158,6 @@ function renderBookings() {
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
     <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
-    <td class="muted">${b.date ? new Date(b.date + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }) : ''}</td>
     <td>${formatSvcTime(b.time)}</td>
     <td>1</td>
     <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
@@ -1302,14 +1251,54 @@ async function cancelBooking() {
   if (svc) svc.booked = Math.max(0, svc.booked - 1);
   showStatus('bk-modal-status', 'Booking cancelled. Seat returned to service.', 'error');
   document.getElementById('btn-cancel-booking').style.display = 'none';
-  renderBookings(); loadDashServices(); renderServicesPanel();
+  renderBookings(); renderDashServices(); renderServicesPanel(); renderScheduleOverview();
 }
 
 // ── Services panel ──
+function renderScheduleOverview() {
+  const thead = document.getElementById('schedule-overview-head');
+  const tbody = document.getElementById('schedule-overview-body');
+  if (!thead || !tbody) return;
+
+  const thS  = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:left;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
+  const thSC = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
+
+  thead.innerHTML = `<tr>
+    <th style="${thS}">Service</th>
+    ${STOPS.map(s => `<th style="${thSC}">Stop ${s.num}<br><span style="font-size:10px;font-weight:400;opacity:0.75;">${s.name.split(' ').slice(0,2).join(' ')}</span></th>`).join('')}
+    <th style="${thS}border-right:none;">Status</th>
+  </tr>`;
+
+  const tdBase = 'padding:8px 10px;font-size:12px;border-bottom:0.5px solid #E5E7EB;border-right:0.5px solid #E5E7EB;white-space:nowrap;';
+
+  tbody.innerHTML = SERVICES.map((s, ri) => {
+    const bg = ri % 2 === 0 ? '#ffffff' : '#F8F6F1';
+    const stopCells = STOPS.map((stop, i) => {
+      const t    = s.times && s.times[i];
+      const isNS = !t || t === '*N/S';
+      const isDO = (s.dropoffOnlyStops || []).includes(stop.num);
+      const val  = isNS
+        ? '<span style="color:#D1D5DB;">—</span>'
+        : isDO
+          ? `<span style="color:#6B7280;">${formatSvcTime(t)}</span><br><span style="font-size:10px;color:#9CA3AF;font-style:italic;">Drop-off</span>`
+          : `<span style="font-weight:600;color:#1A2340;">${formatSvcTime(t)}</span>`;
+      return `<td style="${tdBase}background:${bg};text-align:center;${i===STOPS.length-1?'border-right:0.5px solid #E5E7EB;':''}">${val}</td>`;
+    }).join('');
+    const badge = s.disabled
+      ? '<span class="badge badge-cancelled">Disabled</span>'
+      : '<span class="badge badge-confirmed">Active</span>';
+    return `<tr>
+      <td style="${tdBase}background:${bg};font-weight:700;color:var(--navy);">Service No.${s.id}</td>
+      ${stopCells}
+      <td style="${tdBase}background:${bg};border-right:none;">${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
 function renderServicesPanel() {
   const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
   document.getElementById('svc-booked-total').textContent = totalBooked;
-  document.getElementById('svc-avail-total').textContent  = CAP*SERVICES.length - totalBooked;
+  document.getElementById('svc-avail-total').textContent  = CAP*9 - totalBooked;
   const tbody = document.getElementById('svc-tbody');
   tbody.innerHTML = SERVICES.map(s => {
     const left = CAP - s.booked;
@@ -1351,11 +1340,11 @@ async function toggleServiceDisabled(svcId) {
   });
   if (res && res.ok) {
     svc.disabled = newDisabled;
-    renderServicesPanel();
+    renderServicesPanel(); renderScheduleOverview();
     showStatus('sched-status', 'Service No.' + svcId + (newDisabled ? ' disabled.' : ' enabled.'), newDisabled ? 'error' : 'success');
   }
 }
-function renderServices() { renderServicesPanel(); }
+function renderServices() { renderServicesPanel(); renderScheduleOverview(); }
 
 // ── Schedule editor ──
 function openEditSchedule(svcId) {
@@ -1441,7 +1430,7 @@ async function saveSchedule() {
   const svc = SERVICES.find(s => s.id === _editSchedSvcId);
   if (svc) svc.times = newTimes;
   showStatus('sched-status', 'Schedule updated for Service No.' + _editSchedSvcId + '.', 'success');
-  renderServicesPanel(); loadDashServices();
+  renderServicesPanel(); renderScheduleOverview(); renderDashServices();
   setTimeout(() => closeModal('modal-schedule'), 1200);
 }
 
