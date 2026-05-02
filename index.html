@@ -126,6 +126,11 @@
 
   /* ── My bookings ── */
   .my-booking-card { background: var(--h-white); border: 0.5px solid var(--h-border-sub); border-radius: 9px; padding: 1rem 1.1rem; margin-bottom: 10px; }
+  .bk-table { display:flex; flex-direction:column; }
+  .bk-row { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:0.5px solid var(--h-border-sub); font-size:13px; gap:12px; }
+  .bk-row:last-child { border-bottom:none; }
+  .bk-label { color:var(--h-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; flex-shrink:0; min-width:85px; }
+  .bk-val { color:var(--h-navy); font-weight:500; text-align:right; line-height:1.4; flex:1; }
   .booking-ref { font-size: 11px; color: var(--h-muted); margin-top: 9px; padding-top: 9px; border-top: 0.5px solid var(--h-border-sub); }
   .booking-ref span { font-weight: 600; color: var(--h-navy); letter-spacing: 0.05em; }
   .cancel-confirm { display:none; background:#FCEBEB; border:0.5px solid #F09595; border-radius:8px; padding:12px 14px; margin-top:10px; }
@@ -557,17 +562,15 @@ function renderServices() {
       const t = svc.times[i];
       if (t === '*N/S') return;
       if (fStop !== 'all' && String(stop.num) !== fStop) return;
-      const stopPast    = isStopPast(t);
-      const isDropoff   = (svc.dropoffOnlyStops || []).includes(stop.num);
-      const canBoard    = !stopPast && !isDropoff;
-      stopRows += `<div class="stop-row${canBoard ? ' stop-row-selectable' : ''}" ${canBoard ? `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"` : ''} style="${stopPast || isDropoff ? 'opacity:0.5;cursor:default;' : ''}">
+      const stopPast = isStopPast(t);
+      stopRows += `<div class="stop-row${stopPast ? '' : ' stop-row-selectable'}" ${stopPast ? '' : `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"`} style="${stopPast ? 'opacity:0.4;cursor:default;' : ''}">
         <div class="stop-num">${stop.num}</div>
         <div class="stop-info">
           <div class="stop-name">${stop.name}</div>
           <div class="stop-addr">${stop.addr}</div>
         </div>
         <div class="stop-time">${formatTime(t)}</div>
-        ${isDropoff ? '<div class="stop-select-btn" style="color:var(--h-muted);opacity:1;font-style:italic;">Drop-off only</div>' : (stopPast ? '' : '<div class="stop-select-btn">Board here</div>')}
+        ${stopPast ? '' : '<div class="stop-select-btn">Board here</div>'}
       </div>`;
     });
 
@@ -1171,7 +1174,6 @@ async function loadServices() {
         if (svc.times && svc.times.length >= 6) local.times = svc.times;
         local.disabled = svc.disabled === true;
         local.stopAvailability = svc.stopAvailability || {};
-        local.dropoffOnlyStops = svc.dropoffOnlyStops || [];
       }
     });
     renderServices();
@@ -1364,20 +1366,51 @@ function isBookingPast(b) {
 }
 
 function bookingCardHTML(b) {
+  const boardingStopName  = b.stopName  || (STOPS[(b.stopNum  || 1) - 1]?.name) || ('Stop ' + b.stopNum);
+  const alightingStopName = b.alightName || (b.alightNum ? STOPS[b.alightNum - 1]?.name : null);
+
+  const boardingSvc = SERVICES.find(s => s.id === b.svcId);
+  const boardTime   = b.depTime ? formatTime(b.depTime)
+                    : (boardingSvc ? formatTime(boardingSvc.times[(b.stopNum || 1) - 1]) : '');
+  const alightTime  = (boardingSvc && b.alightNum && boardingSvc.times[b.alightNum - 1] !== '*N/S')
+                    ? formatTime(boardingSvc.times[b.alightNum - 1]) : '';
+
+  const travelDateFmt = b.travelDate
+    ? new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+    : b.date || '';
+
+  const heading = 'Service No.' + b.svcId +
+    (boardingStopName ? ' · Stop ' + b.stopNum + ' ' + boardingStopName : '') +
+    (boardTime ? ' · ' + boardTime : '');
+
+  const alightVal = b.alightNum
+    ? 'Stop ' + b.alightNum + (alightingStopName ? ' – ' + alightingStopName : '') +
+      (alightTime ? ' <span style="color:var(--h-muted);">(' + alightTime + ')</span>' : '')
+    : '—';
+
+  const rows = [
+    ['Date',        travelDateFmt],
+    ['Getting on',  'Stop ' + (b.stopNum || '') + (boardingStopName ? ' – ' + boardingStopName : '') +
+                    (boardTime ? ' <span style="color:var(--h-muted);">(' + boardTime + ')</span>' : '')],
+    ['Getting off', alightVal],
+    ['Reference',   '<span style="font-family:monospace;font-weight:700;letter-spacing:0.05em;">' + b.ref + '</span>'],
+  ];
+
+  const tableRows = rows.map(([label, value]) =>
+    `<div class="bk-row"><span class="bk-label">${label}</span><span class="bk-val">${value}</span></div>`
+  ).join('');
+
   return `
-    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.55;' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div>
-          <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
-          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Getting on: Stop ${b.stopNum}${b.alightNum ? ' · Getting off: Stop ' + b.alightNum : ''} · ${formatTime(b.depTime)} · 1 seat</div>
-        </div>
-        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
+    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.6;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;">
+        <div style="font-size:13px;font-weight:700;color:var(--h-navy);line-height:1.5;flex:1;padding-right:8px;">${heading}</div>
+        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}" style="flex-shrink:0;">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>
-      <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
-        ${!b.cancelled && !isBookingPast(b) ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
-      </div>
+      <div class="bk-table">${tableRows}</div>
       ${!b.cancelled && !isBookingPast(b) ? `
+      <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;padding-top:0.75rem;border-top:0.5px solid var(--h-border-sub);">
+        <button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>
+      </div>
       <div class="cancel-confirm" id="cancel-confirm-${b.ref}">
         <p>Cancel this booking? Your seat will be released.</p>
         <div class="cancel-confirm-btns">
@@ -1387,6 +1420,7 @@ function bookingCardHTML(b) {
       </div>` : ''}
     </div>`;
 }
+
 function renderMyBookingsList(bookings) { filterMyBookings(); }
 
 function showCancelConfirm(ref) {
