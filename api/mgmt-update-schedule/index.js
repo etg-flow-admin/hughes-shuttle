@@ -8,7 +8,10 @@ const { sendEmail, scheduleChangeTemplate }                        = require('..
 module.exports = wrapHandler('mgmt-update-schedule', async function (context, req) {
   let payload;
   try { payload = await verifyToken(req); } catch (err) { authError(context, err); return; }
-  if (!payload.isAdmin) {
+
+  // Verify admin by looking up user record — don't rely on token payload.isAdmin
+  const userRecord = await getListItem('ShuttleUsers', `Title eq '${payload.email}'`).catch(() => null);
+  if (!userRecord || (!userRecord.IsAdmin && userRecord.IsAdmin !== 1)) {
     context.res = { status: 403, body: { error: 'Admin access required.' } }; return;
   }
 
@@ -42,7 +45,7 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
     context.log.info(`mgmt-update-schedule: updated service ${serviceNumber} by ${payload.email}`);
 
     // Fire-and-forget admin notification
-    notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, payload.email || payload.name || 'Admin')
+    notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, payload.email)
       .catch(e => context.log.warn('notifyAdmins failed:', e.message));
 
     context.res = { status: 200, body: { updated: true, serviceNumber, times, dropoffOnlyStops } };
@@ -54,11 +57,14 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
 });
 
 async function notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, changedBy) {
-  // Fetch all users — filter IsAdmin in code to avoid index requirement
-  const allUsers = await getListItems('ShuttleUsers', '', 'id,Title,IsAdmin', 500);
+  // Fetch all users and filter IsAdmin in code (IsAdmin not indexed in SharePoint)
+  const allUsers = await getListItems('ShuttleUsers', '', 'id,Title,Name,IsAdmin', 500);
   const admins   = allUsers.filter(u => u.IsAdmin === true || u.IsAdmin === 1);
-  context.log.info(`notifyAdmins: found ${admins.length} admin(s) from ${allUsers.length} users`);
-  if (!admins.length) return;
+  context.log.info(`notifyAdmins: ${admins.length} admin(s) found from ${allUsers.length} total users`);
+  if (!admins.length) {
+    context.log.warn('notifyAdmins: no admins found — check IsAdmin field in ShuttleUsers');
+    return;
+  }
 
   const subject = `Hughes Shuttle — Service No.${serviceNumber} schedule updated`;
   const html    = scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops || [], changedBy);
@@ -70,5 +76,5 @@ async function notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, cha
         .catch(e => context.log.warn(`Email failed for ${a.Title}:`, e.message));
     })
   );
-  context.log.info(`notifyAdmins: done`);
+  context.log.info('notifyAdmins: complete');
 }

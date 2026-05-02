@@ -822,6 +822,8 @@ async function loadServices() {
     stopAvailability: svc.stopAvailability || {},
     segments:         svc.segments || {},
   }));
+  renderServicesPanel();
+  renderScheduleOverview();
 }
 
 // ── Load bookings ──
@@ -900,7 +902,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadStops(); loadServices(); }
 }
 
 // ── Dashboard services ──
@@ -1318,6 +1320,7 @@ function renderScheduleOverview() {
   const thead = document.getElementById('schedule-overview-head');
   const tbody = document.getElementById('schedule-overview-body');
   if (!thead || !tbody) return;
+  if (!SERVICES || !SERVICES.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:1rem;">Loading…</td></tr>'; return; }
   const thS  = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:left;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
   const thSC = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
   thead.innerHTML = `<tr>

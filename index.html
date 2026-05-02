@@ -500,17 +500,7 @@ let STOPS = [
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
   { num:7, name:'Adelaide University Village',  addr:'Return - 210 Grote St' },
 ];
-const SERVICES = [
-  { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0 },
-  { id:2, times:['7:05', '7:15','*N/S','7:20', '7:25','*N/S'], booked:0 },
-  { id:3, times:['7:40', '7:50','*N/S','7:55', '8:05','*N/S'], booked:0 },
-  { id:4, times:['8:20', '8:30','*N/S','8:40', '8:50','*N/S'], booked:0 },
-  { id:5, times:['9:10','*N/S', '9:20','*N/S','*N/S','*N/S'], booked:0 },
-  { id:6, times:['9:30', '9:40','*N/S','9:50','10:00','*N/S'], booked:0 },
-  { id:7, times:['10:20','10:30','*N/S','10:35','10:45','*N/S'], booked:0 },
-  { id:8, times:['11:10','11:20','*N/S','11:25','11:30','11:40','11:45'], booked:0 },
-  { id:9, times:['11:45','11:55','*N/S','12:00','12:10','12:20','12:25'], booked:0 },
-];
+let SERVICES = []; // populated from API
 
 let myBookings = [];
 
@@ -616,7 +606,7 @@ function renderServices() {
     card.dataset.svcId = svc.id;
     card.innerHTML = `
       <div class="svc-head">
-        <div class="svc-title">Service No.${svc.id}</div>
+        <div class="svc-title">${svc.title || 'Service No.' + svc.id}</div>
         <div class="svc-depart">Departs ${formatTime(firstTime)}</div>
       </div>
       <div class="svc-stops">${stopRows}</div>
@@ -675,7 +665,7 @@ function selectStop(event, rowEl, svcId, stopNum) {
         </div>
       </div>
     </div>
-    <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val">Service No.${svc.id}</span></div>
+    <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val">${svc.title || 'Service No.' + svc.id}</span></div>
     <div class="sum-row"><span class="sum-key">Getting on at</span><span class="sum-val">Stop ${stop.num} – ${stop.name}</span></div>
     <div class="sum-row"><span class="sum-key">Getting off at</span><span class="sum-val" id="sumAlight">—</span></div>
     <div class="sum-row"><span class="sum-key">Departure</span><span class="sum-val">${formatTime(svc.times[stopNum - 1])}</span></div>
@@ -1270,17 +1260,16 @@ async function loadServices() {
     if (!res.ok) { renderServices(); return; }
     const data = await res.json();
     // Merge live seat data — coerce to number for safe comparison
-    (data.services || []).forEach(svc => {
-      const local = SERVICES.find(s => +s.id === +svc.serviceNumber);
-      if (local) {
-        local.booked = svc.booked != null ? +svc.booked : local.booked;
-        if (svc.times && svc.times.length >= 6) local.times = svc.times;
-        local.disabled = svc.disabled === true;
-        local.stopAvailability = svc.stopAvailability || {};
-        local.segments         = svc.segments || {};
-        local.dropoffOnlyStops = svc.dropoffOnlyStops || [];
-      }
-    });
+    SERVICES = (data.services || []).map(svc => ({
+      id:               +svc.serviceNumber,
+      title:            svc.title || ('Service No.' + svc.serviceNumber),
+      times:            svc.times || [],
+      booked:           svc.booked || 0,
+      disabled:         svc.disabled === true,
+      stopAvailability: svc.stopAvailability || {},
+      segments:         svc.segments || {},
+      dropoffOnlyStops: svc.dropoffOnlyStops || [],
+    }));
     renderServices();
   } catch (err) {
     renderServices();
@@ -1487,7 +1476,8 @@ function bookingCardHTML(b) {
     ? new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
     : b.date || '';
 
-  const heading = 'Service No.' + b.svcId +
+  const _svcObj = SERVICES.find(s => s.id === b.svcId);
+  const heading = (_svcObj?.title || ('Service No.' + b.svcId)) +
     (boardingStopName ? ' · Stop ' + b.stopNum + ' ' + boardingStopName : '') +
     (boardTime ? ' · ' + boardTime : '');
 
