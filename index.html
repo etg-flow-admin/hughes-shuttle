@@ -427,7 +427,12 @@
       <div id="panelMy" style="display:none;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;flex-wrap:wrap;">
           <p class="sel-label" style="margin:0;flex-shrink:0;">My bookings</p>
-          <div style="display:flex;gap:4px;margin-left:auto;">
+          <div style="display:flex;gap:4px;margin-left:auto;align-items:center;">
+            <select id="myBookingFilter" onchange="filterMyBookings()" style="font-size:12px;padding:5px 8px;border-radius:6px;border:0.5px solid var(--h-border-sub);background:var(--h-white);color:var(--h-navy);font-family:inherit;cursor:pointer;">
+              <option value="Confirmed">Confirmed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="all">All bookings</option>
+            </select>
             <button id="viewBtnWeek" onclick="setMyView('week')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-navy);color:var(--h-gold);">Week</button>
             <button id="viewBtnDay" onclick="setMyView('day')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-offwhite);color:var(--h-muted);border:0.5px solid var(--h-border-sub);">Day</button>
           </div>
@@ -458,7 +463,7 @@ const STOPS = [
   { num:4, name:'Bus Interchange Centre',       addr:'Stop C3 King William St - East side' },
   { num:5, name:'City Campus East',             addr:'Business School' },
   { num:6, name:'Central Market & Chinatown',   addr:'Stop W2 Grote St - South side' },
-  { num:7, name:'Adelaide University Village',  addr:'Return - 210 Grote St' },
+  { num:7, name:'Adelaide University Village',  addr:'Return - 210 Grote St', terminalStop: true },
 ];
 const SERVICES = [
   { id:1, times:['06:45','*N/S','06:55','*N/S','*N/S','*N/S'], booked:0 },
@@ -557,15 +562,17 @@ function renderServices() {
       const t = svc.times[i];
       if (t === '*N/S') return;
       if (fStop !== 'all' && String(stop.num) !== fStop) return;
-      const stopPast = isStopPast(t);
-      stopRows += `<div class="stop-row${stopPast ? '' : ' stop-row-selectable'}" ${stopPast ? '' : `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"`} style="${stopPast ? 'opacity:0.4;cursor:default;' : ''}">
+      const stopPast     = isStopPast(t);
+      const isTerminal  = stop.terminalStop === true;
+      const canBoard    = !stopPast && !isTerminal;
+      stopRows += `<div class="stop-row${canBoard ? ' stop-row-selectable' : ''}" ${canBoard ? `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"` : ''} style="${stopPast || isTerminal ? 'opacity:0.4;cursor:default;' : ''}">
         <div class="stop-num">${stop.num}</div>
         <div class="stop-info">
           <div class="stop-name">${stop.name}</div>
           <div class="stop-addr">${stop.addr}</div>
         </div>
         <div class="stop-time">${formatTime(t)}</div>
-        ${stopPast ? '' : '<div class="stop-select-btn">Board here</div>'}
+        ${isTerminal ? '<div class="stop-select-btn" style="color:var(--h-muted);opacity:1;">Drop off only</div>' : (stopPast ? '' : '<div class="stop-select-btn">Board here</div>')}
       </div>`;
     });
 
@@ -1326,10 +1333,14 @@ function filterMyBookings() {
       s.toLocaleDateString('en-AU', { day:'numeric', month:'short' }) + ' – ' +
       e.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
     const days = Array.from({length:7}, (_,i) => addDays(weekStart, i));
-    const hasAny = days.some(d => _myBookings.some(b => b.travelDate === d));
+    const _statusFilter = document.getElementById('myBookingFilter')?.value || 'Confirmed';
+    const filteredBks = _statusFilter === 'all' ? _myBookings : _myBookings.filter(b =>
+      _statusFilter === 'Confirmed' ? !b.cancelled : b.cancelled
+    );
+    const hasAny = days.some(d => filteredBks.some(b => b.travelDate === d));
     if (!hasAny) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings this week.</div>'; return; }
     list.innerHTML = days.map(day => {
-      const bks = _myBookings.filter(b => b.travelDate === day);
+      const bks = filteredBks.filter(b => b.travelDate === day);
       if (!bks.length) return '';
       const isToday = day === _localTodayStr;
       return '<div style="margin-bottom:1rem;">' +
@@ -1340,8 +1351,9 @@ function filterMyBookings() {
   } else {
     const day = _myAnchor;
     document.getElementById('myPeriodLabel').textContent = fmtDay(day) + (day === _localTodayStr ? ' · Today' : '');
-    const bks = _myBookings.filter(b => b.travelDate === day);
-    if (!bks.length) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this day.</div>'; return; }
+    const _sf = document.getElementById('myBookingFilter')?.value || 'Confirmed';
+    const bks = (_sf === 'all' ? _myBookings : _myBookings.filter(b => _sf === 'Confirmed' ? !b.cancelled : b.cancelled)).filter(b => b.travelDate === day);
+    if (!bks.length) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this filter.</div>'; return; }
     list.innerHTML = bks.map(b => bookingCardHTML(b)).join('');
   }
 }
@@ -1361,53 +1373,20 @@ function isBookingPast(b) {
 }
 
 function bookingCardHTML(b) {
-  // Use pre-mapped names from loadMyBookings where possible
-  const boardingStopName  = b.stopName  || (STOPS[(b.stopNum  || 1) - 1]?.name) || ('Stop ' + b.stopNum);
-  const alightingStopName = b.alightName || (b.alightNum ? STOPS[b.alightNum - 1]?.name : null);
-
-  // Get times from SERVICES array if loaded
-  const boardingSvc = SERVICES.find(s => s.id === b.svcId);
-  const boardTime   = b.depTime ? formatTime(b.depTime)
-                    : (boardingSvc ? formatTime(boardingSvc.times[(b.stopNum || 1) - 1]) : '');
-  const alightTime  = (boardingSvc && b.alightNum && boardingSvc.times[b.alightNum - 1] !== '*N/S')
-                    ? formatTime(boardingSvc.times[b.alightNum - 1]) : '';
-
-  const travelDateFmt = b.travelDate
-    ? new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
-    : b.date || '';
-
-  const heading = 'Service No.' + b.svcId +
-    (boardingStopName ? ' · Stop ' + b.stopNum + ' ' + boardingStopName : '') +
-    (boardTime ? ' · ' + boardTime : '');
-
-  const alightVal = b.alightNum
-    ? 'Stop ' + b.alightNum + (alightingStopName ? ' – ' + alightingStopName : '') +
-      (alightTime ? ' <span style="color:var(--h-muted);">(' + alightTime + ')</span>' : '')
-    : '—';
-
-  const rows = [
-    ['Date',        travelDateFmt],
-    ['Getting on',  'Stop ' + (b.stopNum || '') + (boardingStopName ? ' – ' + boardingStopName : '') +
-                    (boardTime ? ' <span style="color:var(--h-muted);">(' + boardTime + ')</span>' : '')],
-    ['Getting off', alightVal],
-    ['Reference',   '<span style="font-family:monospace;font-weight:700;letter-spacing:0.05em;">' + b.ref + '</span>'],
-  ];
-
-  const tableRows = rows.map(([label, value]) =>
-    `<div class="bk-row"><span class="bk-label">${label}</span><span class="bk-val">${value}</span></div>`
-  ).join('');
-
   return `
-    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.6;' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;">
-        <div style="font-size:13px;font-weight:700;color:var(--h-navy);line-height:1.4;">${heading}</div>
-        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}" style="flex-shrink:0;margin-left:8px;">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
+    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.55;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
+          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Getting on: Stop ${b.stopNum}${b.alightNum ? ' · Getting off: Stop ' + b.alightNum : ''} · ${formatTime(b.depTime)} · 1 seat</div>
+        </div>
+        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>
-      <div class="bk-table">${tableRows}</div>
+      <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
+        ${!b.cancelled && !isBookingPast(b) ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
+      </div>
       ${!b.cancelled && !isBookingPast(b) ? `
-      <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;padding-top:0.75rem;border-top:0.5px solid var(--h-border-sub);">
-        <button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>
-      </div>
       <div class="cancel-confirm" id="cancel-confirm-${b.ref}">
         <p>Cancel this booking? Your seat will be released.</p>
         <div class="cancel-confirm-btns">
@@ -1417,7 +1396,6 @@ function bookingCardHTML(b) {
       </div>` : ''}
     </div>`;
 }
-
 function renderMyBookingsList(bookings) { filterMyBookings(); }
 
 function showCancelConfirm(ref) {
