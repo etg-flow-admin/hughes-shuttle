@@ -91,6 +91,7 @@ async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) 
   const segStops = [];
   for (let s = boardingStop; s < alightingStop; s++) segStops.push(s);
 
+  // First pass: read all segments and check capacity
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const entities = {};
@@ -102,30 +103,33 @@ async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) 
         else throw e;
       }
     }
+    // Check capacity across all segments
     for (const stop of segStops) {
       if ((entities[stop]?.onBoard || 0) >= CAPACITY) {
         return { success: false, reason: 'full', fullAtStop: stop };
       }
     }
-    try {
-      const actions = segStops.map(stop => {
-        const rk     = `${serviceNumber}-${stop}`;
-        const onBoard = (entities[stop]?.onBoard || 0) + 1;
-        const entity  = { partitionKey: pk, rowKey: rk, onBoard };
+    // Increment each segment individually
+    let allOk = true;
+    for (const stop of segStops) {
+      const rk      = `${serviceNumber}-${stop}`;
+      const onBoard = (entities[stop]?.onBoard || 0) + 1;
+      try {
         if (entities[stop]) {
-          // Use Merge mode to avoid wiping unknown fields, match on etag
-          return ['update', entity, { etag: entities[stop]['odata.etag'] || entities[stop].etag || '*', mode: 'Merge' }];
+          await client.updateEntity({ partitionKey: pk, rowKey: rk, onBoard }, 'Merge');
         } else {
-          return ['create', entity];
+          await client.createEntity({ partitionKey: pk, rowKey: rk, onBoard });
         }
-      });
-      await client.submitTransaction(actions);
+      } catch (e) {
+        if (e.statusCode === 412 || e.statusCode === 409) { allOk = false; break; }
+        throw e;
+      }
+    }
+    if (allOk) {
       const seatsLeft = CAPACITY - Math.max(...segStops.map(s => (entities[s]?.onBoard || 0) + 1));
       return { success: true, seatsLeft: Math.max(0, seatsLeft) };
-    } catch (e) {
-      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied') || e.message?.includes('412')) continue;
-      throw e;
     }
+    // Retry on conflict
   }
   return { success: false, reason: 'conflict' };
 }
@@ -138,39 +142,37 @@ async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop
 
   if (segStops.length === 0) return { success: true };
 
-  const MAX_RETRIES = 5;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const entities = {};
-    for (const stop of segStops) {
+  // Use individual updateEntity calls — more reliable than batch for cancellations
+  // and gives clearer error messages per segment
+  for (const stop of segStops) {
+    const rk = `${serviceNumber}-${stop}`;
+    const MAX_RETRIES = 5;
+    let decremented = false;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      let entity;
       try {
-        entities[stop] = await client.getEntity(pk, `${serviceNumber}-${stop}`);
+        entity = await client.getEntity(pk, rk);
       } catch (e) {
-        if (e.statusCode === 404) entities[stop] = null;
-        else throw e;
+        if (e.statusCode === 404) { decremented = true; break; } // row doesn't exist — nothing to decrement
+        throw e;
+      }
+      const current = entity.onBoard || 0;
+      if (current <= 0) { decremented = true; break; } // already 0
+      try {
+        await client.updateEntity(
+          { partitionKey: pk, rowKey: rk, onBoard: current - 1 },
+          'Merge'
+        );
+        decremented = true;
+        break;
+      } catch (e) {
+        if (e.statusCode === 412) continue; // ETag conflict — retry
+        throw e;
       }
     }
-
-    // Filter to stops that actually have data and onBoard > 0
-    const toUpdate = segStops.filter(stop => entities[stop] && (entities[stop].onBoard || 0) > 0);
-    if (toUpdate.length === 0) return { success: true }; // already at 0
-
-    try {
-      const actions = toUpdate.map(stop => {
-        const onBoard = Math.max(0, (entities[stop].onBoard || 0) - 1);
-        const etag    = entities[stop]['odata.etag'] || entities[stop].etag || '*';
-        return ['update',
-          { partitionKey: pk, rowKey: `${serviceNumber}-${stop}`, onBoard },
-          { etag, mode: 'Merge' }
-        ];
-      });
-      await client.submitTransaction(actions);
-      return { success: true };
-    } catch (e) {
-      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied') || e.message?.includes('412')) continue;
-      throw e;
-    }
+    if (!decremented) return { success: false, reason: 'conflict', stop };
   }
-  return { success: false, reason: 'conflict' };
+  return { success: true };
 }
 
 module.exports = { bookSeat, cancelSeat, getAvailabilityForDate, getStopAvailability, getServiceSegments, CAPACITY };
