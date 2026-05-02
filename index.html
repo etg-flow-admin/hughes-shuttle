@@ -1601,9 +1601,9 @@ function updateServiceDateLabel(isoStr) {
 }
 const _startDate = isWeekend(_localTodayStr) ? nextWeekday(_localTodayStr) : _localTodayStr;
 document.getElementById('dateInput').value = _startDate;
-// Restrict booking to 7 days in advance
+// Restrict booking to 9 days in advance
 const _maxBookingDate = new Date(_localToday);
-_maxBookingDate.setDate(_maxBookingDate.getDate() + 7);
+_maxBookingDate.setDate(_maxBookingDate.getDate() + 9);
 const _maxDateStr = _maxBookingDate.getFullYear() + '-' +
   String(_maxBookingDate.getMonth() + 1).padStart(2, '0') + '-' +
   String(_maxBookingDate.getDate()).padStart(2, '0');

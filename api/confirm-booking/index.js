@@ -1,5 +1,4 @@
 // POST /api/confirm-booking
-// { serviceNumber, boardingStop, alightingStop, travelDate }
 const { verifyToken, authError }      = require('../shared/auth');
 const { wrapHandler }                 = require('../shared/logger');
 const { getListItem, createListItem } = require('../shared/msLists');
@@ -29,26 +28,19 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
     context.res = { status: 400, body: { error: 'Getting off stop must be after getting on stop.' } }; return;
   }
 
-  const email     = payload.email;
-  const studentId = payload.studentId;
-  const name      = payload.name;
+  const email = payload.email, studentId = payload.studentId, name = payload.name;
 
   try {
-    // Check 7-day advance booking limit
-    const today    = new Date(); today.setHours(0,0,0,0);
-    const travel   = new Date(travelDate + 'T00:00:00');
+    const today  = new Date(); today.setHours(0,0,0,0);
+    const travel = new Date(travelDate + 'T00:00:00');
     const diffDays = Math.round((travel - today) / (1000 * 60 * 60 * 24));
-    if (diffDays > 7) {
-      context.res = { status: 400, body: { error: 'Bookings can only be made up to 7 days in advance.' } }; return;
+    if (diffDays > 9) {
+      context.res = { status: 400, body: { error: 'Bookings can only be made up to 9 days in advance.' } }; return;
     }
-
-    // Block weekends
     const travelDay = travel.getDay();
     if (travelDay === 0 || travelDay === 6) {
       context.res = { status: 400, body: { error: 'Bookings are not available on weekends.' } }; return;
     }
-
-    // Check duplicate booking
     const existing = await getListItem(
       'ShuttleBookings',
       `UserEmail eq '${email}' and ServiceNumber eq ${serviceNumber} and TravelDate eq '${travelDate}' and Status ne 'Cancelled'`
@@ -56,60 +48,32 @@ module.exports = wrapHandler('confirm-booking', async function (context, req) {
     if (existing) {
       context.res = { status: 409, body: { error: 'You already have a booking on this service for that date.' } }; return;
     }
-
-    // Get departure time
     const svcItem   = await getListItem('ShuttleServices', `ServiceNumber eq ${serviceNumber}`);
-    const stopKey   = `Stop${boardingStop}Time`;
-    const depTime   = svcItem ? (svcItem[stopKey] || '') : '';
+    const depTime   = svcItem ? (svcItem[`Stop${boardingStop}Time`] || '') : '';
     const boarding  = STOPS[+boardingStop - 1] || { name: `Stop ${boardingStop}` };
     const alighting = STOPS[+alightingStop - 1] || { name: `Stop ${alightingStop}` };
 
-    // Atomic segment booking
     const result = await bookSeat(travelDate, serviceNumber, +boardingStop, +alightingStop);
     if (!result.success) {
-      const msg = result.reason === 'full'
-        ? 'Sorry, no seats available between your stops.'
-        : 'Unable to secure your seat — please try again.';
+      const msg = result.reason === 'full' ? 'Sorry, no seats available between your stops.' : 'Unable to secure your seat — please try again.';
       context.res = { status: 409, body: { error: msg } }; return;
     }
-
-    // Create booking record
     const ref = 'SHT-' + Math.floor(1000 + Math.random() * 9000);
-
     let roomNumber = '';
-    try {
-      const userRecord = await getListItem('ShuttleUsers', `Title eq '${email}'`);
-      roomNumber = userRecord?.RoomNumber || '';
-    } catch (e) { /* non-fatal */ }
+    try { const u = await getListItem('ShuttleUsers', `Title eq '${email}'`); roomNumber = u?.RoomNumber || ''; } catch(e) {}
 
     await createListItem('ShuttleBookings', {
-      Title:         ref,
-      UserEmail:     email,
-      StudentID:     studentId,
-      Name:          name,
-      RoomNumber:    roomNumber,
-      ServiceNumber: serviceNumber,
-      StopNumber:    boardingStop,
-      AlightingStop: alightingStop,
-      DepartureTime: depTime,
-      TravelDate:    travelDate,
-      Status:        'Confirmed',
-      BookedAt:      new Date().toISOString(),
+      Title: ref, UserEmail: email, StudentID: studentId, Name: name, RoomNumber: roomNumber,
+      ServiceNumber: serviceNumber, StopNumber: boardingStop, AlightingStop: alightingStop,
+      DepartureTime: depTime, TravelDate: travelDate, Status: 'Confirmed', BookedAt: new Date().toISOString(),
     });
-
-    // Send confirmation email
     const cancelUrl = `https://book.hughesshuttle.com.au?cancel=${ref}`;
-    sendEmail(
-      email,
+    sendEmail(email,
       `Booking confirmed — Hughes Shuttle Service No.${serviceNumber} on ${travelDate.split('-').reverse().join('/')}`,
       bookingConfirmTemplate(name, ref, serviceNumber, boarding.name, alighting.name, depTime, travelDate, cancelUrl)
-    ).catch(e => context.log.warn('Confirm email failed:', e.message));
+    ).catch(e => context.log.warn('Email failed:', e.message));
 
-    context.log.info(`confirm-booking: ${email} svc${serviceNumber} stop${boardingStop}to${alightingStop} on ${travelDate} — ${ref}`);
-    context.res = {
-      status: 200,
-      body: { ref, serviceNumber, boardingStop, alightingStop, travelDate, depTime, status: 'Confirmed', seatsLeft: result.seatsLeft }
-    };
+    context.res = { status: 200, body: { ref, serviceNumber, boardingStop, alightingStop, travelDate, depTime, status: 'Confirmed', seatsLeft: result.seatsLeft } };
   } catch (err) {
     context.log.error('confirm-booking:', err.message);
     context.res = { status: 500, body: { error: 'Booking failed. Please try again.' } };
