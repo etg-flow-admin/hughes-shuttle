@@ -1,42 +1,25 @@
-const fetch = require('node-fetch');
-const { AsyncLocalStorage } = require('async_hooks');
+// api/shared/msLists.js
+// Microsoft Graph API — uses list IDs from app settings
 
-const requestContext = new AsyncLocalStorage();
+const fetch = require('node-fetch');
 
 const TENANT_ID  = process.env.SHAREPOINT_TENANT_ID;
 const CLIENT_ID  = process.env.SHAREPOINT_CLIENT_ID;
 const SITE_ID    = 'equitytransportgroup.sharepoint.com,7d2ff47a-ce6d-480d-ba80-0338c1eece11,0908d58e-4a2a-4a75-b2c2-6b1aefb88c5c';
 
-const PROD_ORIGINS = ['https://book.hughesshuttle.com.au'];
+const LIST_IDS = {
+  ShuttleUsers:    process.env.SHAREPOINT_LIST_USERS,
+  ShuttleBookings: process.env.SHAREPOINT_LIST_BOOKINGS,
+  ShuttleServices: process.env.SHAREPOINT_LIST_SERVICES,
+};
 
-function isSandboxRequest(req) {
-  // Check explicit req first, then fall back to AsyncLocalStorage context
-  const r = req || requestContext.getStore();
-  if (!r) return false;
-  const origin = (r.headers && (r.headers.origin || r.headers.Origin || r.headers.referer || r.headers.Referer)) || '';
-  if (!origin) return false;
-  return !PROD_ORIGINS.some(o => origin.startsWith(o));
-}
-
-// Call this at the start of each function handler to set request context
-function setRequestContext(req) {
-  return requestContext.run(req, () => {});
-}
-
-function getListIds(req) {
-  const sandbox = isSandboxRequest(req);
-  return {
-    ShuttleUsers:    sandbox ? process.env.SHAREPOINT_LIST_USERS_SANDBOX    : process.env.SHAREPOINT_LIST_USERS,
-    ShuttleBookings: sandbox ? process.env.SHAREPOINT_LIST_BOOKINGS_SANDBOX : process.env.SHAREPOINT_LIST_BOOKINGS,
-    ShuttleServices: sandbox ? process.env.SHAREPOINT_LIST_SERVICES_SANDBOX : process.env.SHAREPOINT_LIST_SERVICES,
-  };
-}
 const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 
+// Explicit field selects for each list — required to retrieve hidden fields
 const LIST_FIELDS = {
   ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt,TwoFactorCode,TwoFactorExpiry,TrustedDevices',
-  ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,AlightingStop,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
-  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,UpdatedAt',
+  ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
+  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time',
 };
 
 let _tokenCache = { token: null, expiry: 0 };
@@ -59,18 +42,17 @@ async function getGraphToken() {
   return data.access_token;
 }
 
-function getListId(listName, req) {
-  const ids = getListIds(req || requestContext.getStore());
-  const id  = ids[listName];
+function getListId(listName) {
+  const id = LIST_IDS[listName];
   if (!id) throw new Error(`List ID not configured for '${listName}'. Check SHAREPOINT_LIST_* app settings.`);
   return id;
 }
 
-async function getListItems(listName, filter = '', select = '', top = 500, req = null) {
-  const token  = await getGraphToken();
-  const listId = getListId(listName, req);
-  const fields = select || LIST_FIELDS[listName] || '';
-  const expand = fields ? `fields($select=${fields})` : 'fields';
+async function getListItems(listName, filter = '', select = '', top = 500) {
+  const token    = await getGraphToken();
+  const listId   = getListId(listName);
+  const fields   = select || LIST_FIELDS[listName] || '';
+  const expand   = fields ? `fields($select=${fields})` : 'fields';
   const graphFilter = filter ? filter.replace(/(\w+)\s+(eq|ne|lt|gt|le|ge|startswith)/gi, 'fields/$1 $2') : '';
   let url = `${GRAPH_BASE}/${listId}/items?$expand=${expand}&$top=${top}`;
   if (graphFilter) url += `&$filter=${encodeURIComponent(graphFilter)}`;
@@ -86,14 +68,14 @@ async function getListItems(listName, filter = '', select = '', top = 500, req =
   return (data.value || []).map(item => ({ ID: item.id, ...item.fields }));
 }
 
-async function getListItem(listName, filter, req = null) {
-  const items = await getListItems(listName, filter, '', 1, req);
+async function getListItem(listName, filter) {
+  const items = await getListItems(listName, filter, '', 1);
   return items[0] || null;
 }
 
-async function createListItem(listName, fields, req = null) {
+async function createListItem(listName, fields) {
   const token  = await getGraphToken();
-  const listId = getListId(listName, req);
+  const listId = getListId(listName);
   const url    = `${GRAPH_BASE}/${listId}/items`;
   const res    = await fetch(url, {
     method:  'POST',
@@ -105,9 +87,9 @@ async function createListItem(listName, fields, req = null) {
   return { ID: data.id, ...data.fields };
 }
 
-async function updateListItem(listName, itemId, fields, req = null) {
+async function updateListItem(listName, itemId, fields) {
   const token  = await getGraphToken();
-  const listId = getListId(listName, req);
+  const listId = getListId(listName);
   const url    = `${GRAPH_BASE}/${listId}/items/${itemId}/fields`;
   const res    = await fetch(url, {
     method:  'PATCH',
@@ -121,4 +103,4 @@ async function updateListItem(listName, itemId, fields, req = null) {
   return true;
 }
 
-module.exports = { getListItems, getListItem, createListItem, updateListItem, isSandboxRequest, setRequestContext, requestContext };
+module.exports = { getListItems, getListItem, createListItem, updateListItem };

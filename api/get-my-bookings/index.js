@@ -1,6 +1,7 @@
 // GET /api/get-my-bookings
+// Returns bookings for the authenticated student
 const { verifyToken, authError } = require('../shared/auth');
-const { wrapHandler }            = require('../shared/logger');
+const { wrapHandler }    = require('../shared/logger');
 const { getListItems }           = require('../shared/msLists');
 
 module.exports = wrapHandler('get-my-bookings', async function (context, req) {
@@ -12,7 +13,7 @@ module.exports = wrapHandler('get-my-bookings', async function (context, req) {
     const items = await getListItems(
       'ShuttleBookings',
       `UserEmail eq '${payload.email}'`,
-      'ID,Title,ServiceNumber,StopNumber,AlightingStop,DepartureTime,TravelDate,Status,BookedAt',
+      'ID,Title,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt',
       100
     );
     const bookings = items
@@ -22,7 +23,6 @@ module.exports = wrapHandler('get-my-bookings', async function (context, req) {
         ref:           b.Title,
         serviceNumber: b.ServiceNumber,
         stopNumber:    b.StopNumber,
-        alightingStop: b.AlightingStop,
         departureTime: b.DepartureTime,
         travelDate:    b.TravelDate,
         status:        b.Status,
