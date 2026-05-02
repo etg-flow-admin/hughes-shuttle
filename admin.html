@@ -922,7 +922,8 @@ async function loadDashServices() {
   const tbody = document.getElementById('dash-services-body');
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--muted);">Loading…</td></tr>';
   try {
-    const data = await apiFetch('/api/get-services?date=' + date);
+    const res  = await authFetch('/api/get-services?date=' + date);
+    const data = res && res.ok ? await res.json() : null;
     if (!data || !data.services) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1rem;">No data.</td></tr>'; return; }
     const svcs = data.services;
     tbody.innerHTML = svcs.map(s => {
