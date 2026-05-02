@@ -125,6 +125,11 @@
   .sum-val { color: var(--h-navy); font-weight: 600; }
 
   /* ── My bookings ── */
+  .bk-table { display:flex; flex-direction:column; }
+  .bk-row { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:0.5px solid var(--h-border-sub); font-size:13px; gap:8px; }
+  .bk-row:last-child { border-bottom:none; }
+  .bk-label { color:var(--h-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; flex-shrink:0; min-width:80px; }
+  .bk-val { color:var(--h-navy); font-weight:500; text-align:right; line-height:1.4; }
   .my-booking-card { background: var(--h-white); border: 0.5px solid var(--h-border-sub); border-radius: 9px; padding: 1rem 1.1rem; margin-bottom: 10px; }
   .booking-ref { font-size: 11px; color: var(--h-muted); margin-top: 9px; padding-top: 9px; border-top: 0.5px solid var(--h-border-sub); }
   .booking-ref span { font-weight: 600; color: var(--h-navy); letter-spacing: 0.05em; }
@@ -451,7 +456,7 @@
 </div>
 <script>
 const CAP = 22;
-let STOPS = [
+const STOPS = [
   { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
   { num:2, name:'City Campus West',            addr:'Medical School' },
   { num:3, name:'Bus Interchange Centre',       addr:'Stop W2 King William St - West side' },
@@ -694,8 +699,10 @@ function cancelBooking() {
 function switchTab(t) {
   document.getElementById('panelBook').style.display = t === 'book' ? 'block' : 'none';
   if (t === 'book') {
-    // Reload live seat data from API when switching back to book tab
-    loadServices();
+    const btn = document.querySelector('#bookingForm .btn-gold');
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+    // Re-render with existing counts — do NOT reload from API to avoid flash
+    renderServices();
   }
   document.getElementById('panelMy').style.display   = t === 'my'   ? 'block' : 'none';
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
@@ -994,7 +1001,7 @@ async function submitReset() {
     setSession(token, verifyData.name, verifyData.isAdmin);
     window._resetEmail = null;
     goTo('bookingScreen');
-    loadStopDescriptions().then(() => loadServices());
+    loadServices();
     loadMyBookings();
   } catch (err) {
     showError('resetError', 'Unable to connect. Please try again.');
@@ -1138,25 +1145,6 @@ async function verifyOtp() {
 
 // Also wire the Verify button
 function verifyAndActivate() { verifyOtp(); }
-
-// ══ LOAD STOP DESCRIPTIONS from API ══
-async function loadStopDescriptions() {
-  const token = getToken();
-  if (!token) return;
-  try {
-    const res = await fetch(API_BASE + '/api/get-stops', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.stops && data.stops.length) {
-      data.stops.forEach(s => {
-        const idx = STOPS.findIndex(st => st.num === s.num);
-        if (idx >= 0) { STOPS[idx].name = s.name; STOPS[idx].addr = s.addr; }
-      });
-    }
-  } catch(e) { /* non-fatal — use defaults */ }
-}
 
 // ══ LOAD SERVICES from API ══
 async function loadServices() {
@@ -1378,20 +1366,45 @@ function isBookingPast(b) {
 }
 
 function bookingCardHTML(b) {
+  const boardingSvc   = SERVICES.find(s => s.id === b.svcId);
+  const boardTime     = b.depTime ? formatTime(b.depTime) : (boardingSvc ? formatTime(boardingSvc.times[(b.stopNum || 1) - 1]) : '');
+  const alightTime    = (boardingSvc && b.alightNum) ? formatTime(boardingSvc.times[b.alightNum - 1]) : '';
+  const boardingStop  = STOPS[(b.stopNum || 1) - 1];
+  const alightingStop = b.alightNum ? STOPS[b.alightNum - 1] : null;
+  const travelDateFmt = b.travelDate
+    ? new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+    : b.date || '';
+
+  const heading = `Service No.${b.svcId}` +
+    (boardingStop ? ` · Stop ${b.stopNum} ${boardingStop.name}` : '') +
+    (boardTime    ? ` · ${boardTime}` : '');
+
+  const rows = [
+    ['Date',         travelDateFmt],
+    ['Getting on',   'Stop ' + (b.stopNum || '') + (boardingStop ? ' – ' + boardingStop.name : '') +
+                     (boardTime ? ' <span style="color:var(--h-muted);">(' + boardTime + ')</span>' : '')],
+    ['Getting off',  alightingStop
+                     ? 'Stop ' + b.alightNum + ' – ' + alightingStop.name +
+                       (alightTime ? ' <span style="color:var(--h-muted);">(' + alightTime + ')</span>' : '')
+                     : '—'],
+    ['Reference',    '<span style="font-family:monospace;font-weight:700;letter-spacing:0.05em;">' + b.ref + '</span>'],
+  ];
+
+  const tableRows = rows.map(([label, value]) =>
+    `<div class="bk-row"><span class="bk-label">${label}</span><span class="bk-val">${value}</span></div>`
+  ).join('');
+
   return `
-    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.55;' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div>
-          <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
-          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Getting on: Stop ${b.stopNum}${b.alightNum ? ' · Getting off: Stop ' + b.alightNum : ''} · ${formatTime(b.depTime)} · 1 seat</div>
-        </div>
-        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
+    <div class="my-booking-card" style="${b.cancelled ? 'opacity:0.6;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;">
+        <div style="font-size:13px;font-weight:700;color:var(--h-navy);line-height:1.4;">${heading}</div>
+        <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}" style="flex-shrink:0;margin-left:8px;">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>
-      <div class="booking-ref" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>Ref: <span style="font-weight:600;color:var(--h-navy);letter-spacing:0.05em;">${b.ref}</span></span>
-        ${!b.cancelled && !isBookingPast(b) ? `<button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>` : ''}
-      </div>
+      <div class="bk-table">${tableRows}</div>
       ${!b.cancelled && !isBookingPast(b) ? `
+      <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;padding-top:0.75rem;border-top:0.5px solid var(--h-border-sub);">
+        <button onclick="showCancelConfirm('${b.ref}')" style="background:none;border:none;font-size:12px;color:#A32D2D;cursor:pointer;font-family:inherit;font-weight:600;padding:0;">Cancel booking</button>
+      </div>
       <div class="cancel-confirm" id="cancel-confirm-${b.ref}">
         <p>Cancel this booking? Your seat will be released.</p>
         <div class="cancel-confirm-btns">
@@ -1401,6 +1414,7 @@ function bookingCardHTML(b) {
       </div>` : ''}
     </div>`;
 }
+
 function renderMyBookingsList(bookings) { filterMyBookings(); }
 
 function showCancelConfirm(ref) {
@@ -1495,7 +1509,7 @@ _myAnchor = null; // will be set to this week's Monday on first filterMyBookings
     document.getElementById('navAvatar').textContent = initials;
     document.getElementById('avatarMenuAdmin').style.display = isAdmin ? 'block' : 'none';
     goTo('bookingScreen');
-    loadStopDescriptions().then(() => loadServices());
+    loadServices();
     loadMyBookings().then(() => {
       if (cancelRef) {
         const b = _myBookings.find(b => b.ref === cancelRef && !b.cancelled);
