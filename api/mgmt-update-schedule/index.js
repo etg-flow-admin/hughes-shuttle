@@ -1,14 +1,16 @@
 // POST /api/mgmt-update-schedule
 // { serviceNumber, times, disabled, dropoffOnlyStops }
-// Sends email notification to all admins on schedule change
-const { requireAdmin, authError }                       = require('../shared/auth');
-const { wrapHandler }                                   = require('../shared/logger');
+const { verifyToken, authError }                                   = require('../shared/auth');
+const { wrapHandler }                                              = require('../shared/logger');
 const { getListItem, getListItems, updateListItem, createListItem } = require('../shared/msLists');
-const { sendEmail, scheduleChangeTemplate }             = require('../shared/email');
+const { sendEmail, scheduleChangeTemplate }                        = require('../shared/email');
 
 module.exports = wrapHandler('mgmt-update-schedule', async function (context, req) {
-  let adminPayload;
-  try { adminPayload = await requireAdmin(req); } catch (err) { authError(context, err); return; }
+  let payload;
+  try { payload = await verifyToken(req); } catch (err) { authError(context, err); return; }
+  if (!payload.isAdmin) {
+    context.res = { status: 403, body: { error: 'Admin access required.' } }; return;
+  }
 
   const { serviceNumber, times, disabled, dropoffOnlyStops } = req.body || {};
   if (!serviceNumber || !Array.isArray(times) || times.length < 6) {
@@ -37,13 +39,11 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
       await createListItem('ShuttleServices', { Title: `Service ${serviceNumber}`, ...fields });
     }
 
-    context.log.info(`mgmt-update-schedule: updated service ${serviceNumber} by ${adminPayload?.email}`);
+    context.log.info(`mgmt-update-schedule: updated service ${serviceNumber} by ${payload.email}`);
 
-    // Send email to all admins (fire-and-forget)
-    const changedBy = adminPayload?.email || adminPayload?.name || 'Admin';
-    notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, changedBy).catch(e =>
-      context.log.warn('mgmt-update-schedule: admin notify failed:', e.message)
-    );
+    // Fire-and-forget admin notification
+    notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, payload.email || payload.name || 'Admin')
+      .catch(e => context.log.warn('notifyAdmins failed:', e.message));
 
     context.res = { status: 200, body: { updated: true, serviceNumber, times, dropoffOnlyStops } };
   } catch (err) {
@@ -54,14 +54,21 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
 });
 
 async function notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, changedBy) {
-  const admins = await getListItems('ShuttleUsers', "IsAdmin eq 1", 'id,Title,Name', 200);
+  // Fetch all users — filter IsAdmin in code to avoid index requirement
+  const allUsers = await getListItems('ShuttleUsers', '', 'id,Title,IsAdmin', 500);
+  const admins   = allUsers.filter(u => u.IsAdmin === true || u.IsAdmin === 1);
+  context.log.info(`notifyAdmins: found ${admins.length} admin(s) from ${allUsers.length} users`);
   if (!admins.length) return;
+
   const subject = `Hughes Shuttle — Service No.${serviceNumber} schedule updated`;
   const html    = scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops || [], changedBy);
+
   await Promise.all(
-    admins.map(a => sendEmail(a.Title, subject, html).catch(e =>
-      context.log.warn(`Notify failed for ${a.Title}:`, e.message)
-    ))
+    admins.map(a => {
+      context.log.info(`notifyAdmins: sending to ${a.Title}`);
+      return sendEmail(a.Title, subject, html)
+        .catch(e => context.log.warn(`Email failed for ${a.Title}:`, e.message));
+    })
   );
-  context.log.info(`mgmt-update-schedule: notified ${admins.length} admin(s)`);
+  context.log.info(`notifyAdmins: done`);
 }
