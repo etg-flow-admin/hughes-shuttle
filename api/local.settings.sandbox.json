@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "SHAREPOINT_TENANT_ID": "ca8ab179-c6f7-4c73-96d8-d9fbe8a17c4b",
+    "SHAREPOINT_CLIENT_ID": "a6cec758-94e1-4f6d-a4cc-0b628ae427c9",
+    "ENVIRONMENT": "sandbox",
+    "SHAREPOINT_LIST_USERS_SANDBOX":    "147790cc-6270-4317-b975-119fbe5d727f",
+    "SHAREPOINT_LIST_BOOKINGS_SANDBOX": "8b325028-bb4d-4602-9d86-84c91bb20b77",
+    "SHAREPOINT_LIST_SERVICES_SANDBOX": "da905fe5-6919-4871-ad7b-45a919fe1bda",
+    "SEGMENTS_TABLE_NAME_SANDBOX": "ShuttleSegmentsSandbox"
+  }
+}

@@ -1,25 +1,24 @@
 // api/shared/msLists.js
-// Microsoft Graph API — uses list IDs from app settings
-
 const fetch = require('node-fetch');
 
 const TENANT_ID  = process.env.SHAREPOINT_TENANT_ID;
 const CLIENT_ID  = process.env.SHAREPOINT_CLIENT_ID;
 const SITE_ID    = 'equitytransportgroup.sharepoint.com,7d2ff47a-ce6d-480d-ba80-0338c1eece11,0908d58e-4a2a-4a75-b2c2-6b1aefb88c5c';
 
+const isSandbox = process.env.ENVIRONMENT === 'sandbox';
+
 const LIST_IDS = {
-  ShuttleUsers:    process.env.SHAREPOINT_LIST_USERS,
-  ShuttleBookings: process.env.SHAREPOINT_LIST_BOOKINGS,
-  ShuttleServices: process.env.SHAREPOINT_LIST_SERVICES,
+  ShuttleUsers:    isSandbox ? process.env.SHAREPOINT_LIST_USERS_SANDBOX    : process.env.SHAREPOINT_LIST_USERS,
+  ShuttleBookings: isSandbox ? process.env.SHAREPOINT_LIST_BOOKINGS_SANDBOX : process.env.SHAREPOINT_LIST_BOOKINGS,
+  ShuttleServices: isSandbox ? process.env.SHAREPOINT_LIST_SERVICES_SANDBOX : process.env.SHAREPOINT_LIST_SERVICES,
 };
 
 const GRAPH_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists`;
 
-// Explicit field selects for each list — required to retrieve hidden fields
 const LIST_FIELDS = {
   ShuttleUsers:    'id,Title,Name,StudentID,RoomNumber,PasswordHash,EmailVerified,OTPCode,OTPExpiry,Status,IsAdmin,Mobile,LastLoginAt,CreatedAt,TwoFactorCode,TwoFactorExpiry,TrustedDevices',
-  ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
-  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time',
+  ShuttleBookings: 'id,Title,UserEmail,Name,StudentID,RoomNumber,ServiceNumber,StopNumber,AlightingStop,DepartureTime,TravelDate,Status,BookedAt,CancelledAt',
+  ShuttleServices: 'id,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,UpdatedAt',
 };
 
 let _tokenCache = { token: null, expiry: 0 };
@@ -49,10 +48,10 @@ function getListId(listName) {
 }
 
 async function getListItems(listName, filter = '', select = '', top = 500) {
-  const token    = await getGraphToken();
-  const listId   = getListId(listName);
-  const fields   = select || LIST_FIELDS[listName] || '';
-  const expand   = fields ? `fields($select=${fields})` : 'fields';
+  const token  = await getGraphToken();
+  const listId = getListId(listName);
+  const fields = select || LIST_FIELDS[listName] || '';
+  const expand = fields ? `fields($select=${fields})` : 'fields';
   const graphFilter = filter ? filter.replace(/(\w+)\s+(eq|ne|lt|gt|le|ge|startswith)/gi, 'fields/$1 $2') : '';
   let url = `${GRAPH_BASE}/${listId}/items?$expand=${expand}&$top=${top}`;
   if (graphFilter) url += `&$filter=${encodeURIComponent(graphFilter)}`;
