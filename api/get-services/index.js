@@ -1,13 +1,11 @@
 // GET /api/get-services?date=YYYY-MM-DD
-// Returns schedule + per-stop seat availability from ShuttleSegments table
 const { verifyToken, authError }  = require('../shared/auth');
 const { wrapHandler }             = require('../shared/logger');
 const { getListItems }            = require('../shared/msLists');
 const { getAvailabilityForDate, getStopAvailability, CAPACITY } = require('../shared/tableStorage');
 
 module.exports = wrapHandler('get-services', async function (context, req) {
-  try { await verifyToken(req); }
-  catch (err) { authError(context, err); return; }
+  try { await verifyToken(req); } catch (err) { authError(context, err); return; }
 
   const travelDate = req.query && req.query.date;
   if (!travelDate) {
@@ -17,7 +15,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
   try {
     const scheduleItems = await getListItems(
       'ShuttleServices', '',
-      'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled',
+      'ID,ServiceNumber,Stop1Time,Stop2Time,Stop3Time,Stop4Time,Stop5Time,Stop6Time,Stop7Time,IsDisabled,DropoffOnlyStops',
       20
     );
 
@@ -38,9 +36,17 @@ module.exports = wrapHandler('get-services', async function (context, req) {
             s.Stop6Time || '*N/S',
             s.Stop7Time || '*N/S',
           ];
+
+          // Parse drop-off only stops — stored as "7" or "5,7"
+          const dropoffOnlyStops = (s.DropoffOnlyStops || '')
+            .split(',')
+            .map(n => parseInt(n.trim()))
+            .filter(n => !isNaN(n));
+
           const activeStops = times.map((t, i) => t !== '*N/S' ? i + 1 : null).filter(Boolean);
           const avail       = availability[svcNum] || { segments: {}, maxOnBoard: 0 };
           const stopAvail   = await getStopAvailability(travelDate, svcNum, activeStops);
+
           return {
             id:               svcNum,
             serviceNumber:    svcNum,
@@ -50,6 +56,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
             capacity:         CAPACITY,
             stopAvailability: stopAvail,
             segments:         avail.segments || {},
+            dropoffOnlyStops,
           };
         })
     );
