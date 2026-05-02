@@ -125,11 +125,6 @@
   .sum-val { color: var(--h-navy); font-weight: 600; }
 
   /* ── My bookings ── */
-  .bk-table { display:flex; flex-direction:column; }
-  .bk-row { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:0.5px solid var(--h-border-sub); font-size:13px; gap:8px; }
-  .bk-row:last-child { border-bottom:none; }
-  .bk-label { color:var(--h-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; flex-shrink:0; min-width:80px; }
-  .bk-val { color:var(--h-navy); font-weight:500; text-align:right; line-height:1.4; }
   .my-booking-card { background: var(--h-white); border: 0.5px solid var(--h-border-sub); border-radius: 9px; padding: 1rem 1.1rem; margin-bottom: 10px; }
   .booking-ref { font-size: 11px; color: var(--h-muted); margin-top: 9px; padding-top: 9px; border-top: 0.5px solid var(--h-border-sub); }
   .booking-ref span { font-weight: 600; color: var(--h-navy); letter-spacing: 0.05em; }
@@ -1366,28 +1361,36 @@ function isBookingPast(b) {
 }
 
 function bookingCardHTML(b) {
-  const boardingSvc   = SERVICES.find(s => s.id === b.svcId);
-  const boardTime     = b.depTime ? formatTime(b.depTime) : (boardingSvc ? formatTime(boardingSvc.times[(b.stopNum || 1) - 1]) : '');
-  const alightTime    = (boardingSvc && b.alightNum) ? formatTime(boardingSvc.times[b.alightNum - 1]) : '';
-  const boardingStop  = STOPS[(b.stopNum || 1) - 1];
-  const alightingStop = b.alightNum ? STOPS[b.alightNum - 1] : null;
+  // Use pre-mapped names from loadMyBookings where possible
+  const boardingStopName  = b.stopName  || (STOPS[(b.stopNum  || 1) - 1]?.name) || ('Stop ' + b.stopNum);
+  const alightingStopName = b.alightName || (b.alightNum ? STOPS[b.alightNum - 1]?.name : null);
+
+  // Get times from SERVICES array if loaded
+  const boardingSvc = SERVICES.find(s => s.id === b.svcId);
+  const boardTime   = b.depTime ? formatTime(b.depTime)
+                    : (boardingSvc ? formatTime(boardingSvc.times[(b.stopNum || 1) - 1]) : '');
+  const alightTime  = (boardingSvc && b.alightNum && boardingSvc.times[b.alightNum - 1] !== '*N/S')
+                    ? formatTime(boardingSvc.times[b.alightNum - 1]) : '';
+
   const travelDateFmt = b.travelDate
     ? new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
     : b.date || '';
 
-  const heading = `Service No.${b.svcId}` +
-    (boardingStop ? ` · Stop ${b.stopNum} ${boardingStop.name}` : '') +
-    (boardTime    ? ` · ${boardTime}` : '');
+  const heading = 'Service No.' + b.svcId +
+    (boardingStopName ? ' · Stop ' + b.stopNum + ' ' + boardingStopName : '') +
+    (boardTime ? ' · ' + boardTime : '');
+
+  const alightVal = b.alightNum
+    ? 'Stop ' + b.alightNum + (alightingStopName ? ' – ' + alightingStopName : '') +
+      (alightTime ? ' <span style="color:var(--h-muted);">(' + alightTime + ')</span>' : '')
+    : '—';
 
   const rows = [
-    ['Date',         travelDateFmt],
-    ['Getting on',   'Stop ' + (b.stopNum || '') + (boardingStop ? ' – ' + boardingStop.name : '') +
-                     (boardTime ? ' <span style="color:var(--h-muted);">(' + boardTime + ')</span>' : '')],
-    ['Getting off',  alightingStop
-                     ? 'Stop ' + b.alightNum + ' – ' + alightingStop.name +
-                       (alightTime ? ' <span style="color:var(--h-muted);">(' + alightTime + ')</span>' : '')
-                     : '—'],
-    ['Reference',    '<span style="font-family:monospace;font-weight:700;letter-spacing:0.05em;">' + b.ref + '</span>'],
+    ['Date',        travelDateFmt],
+    ['Getting on',  'Stop ' + (b.stopNum || '') + (boardingStopName ? ' – ' + boardingStopName : '') +
+                    (boardTime ? ' <span style="color:var(--h-muted);">(' + boardTime + ')</span>' : '')],
+    ['Getting off', alightVal],
+    ['Reference',   '<span style="font-family:monospace;font-weight:700;letter-spacing:0.05em;">' + b.ref + '</span>'],
   ];
 
   const tableRows = rows.map(([label, value]) =>
