@@ -432,7 +432,12 @@
       <div id="panelMy" style="display:none;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.75rem;flex-wrap:wrap;">
           <p class="sel-label" style="margin:0;flex-shrink:0;">My bookings</p>
-          <div style="display:flex;gap:4px;margin-left:auto;">
+          <div style="display:flex;gap:4px;margin-left:auto;align-items:center;">
+            <select id="myBookingFilter" onchange="filterMyBookings()" style="font-size:12px;padding:5px 8px;border-radius:6px;border:0.5px solid var(--h-border-sub);background:var(--h-white);color:var(--h-navy);font-family:inherit;cursor:pointer;">
+              <option value="Confirmed">Confirmed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="all">All bookings</option>
+            </select>
             <button id="viewBtnWeek" onclick="setMyView('week')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-navy);color:var(--h-gold);">Week</button>
             <button id="viewBtnDay" onclick="setMyView('day')" style="padding:5px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;cursor:pointer;font-family:inherit;background:var(--h-offwhite);color:var(--h-muted);border:0.5px solid var(--h-border-sub);">Day</button>
           </div>
@@ -456,7 +461,7 @@
 </div>
 <script>
 const CAP = 22;
-const STOPS = [
+let STOPS = [
   { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
   { num:2, name:'City Campus West',            addr:'Medical School' },
   { num:3, name:'Bus Interchange Centre',       addr:'Stop W2 King William St - West side' },
@@ -562,15 +567,17 @@ function renderServices() {
       const t = svc.times[i];
       if (t === '*N/S') return;
       if (fStop !== 'all' && String(stop.num) !== fStop) return;
-      const stopPast = isStopPast(t);
-      stopRows += `<div class="stop-row${stopPast ? '' : ' stop-row-selectable'}" ${stopPast ? '' : `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"`} style="${stopPast ? 'opacity:0.4;cursor:default;' : ''}">
+      const stopPast  = isStopPast(t);
+      const isDropoff = (svc.dropoffOnlyStops || []).includes(stop.num);
+      const canBoard  = !stopPast && !isDropoff;
+      stopRows += `<div class="stop-row${canBoard ? ' stop-row-selectable' : ''}" ${canBoard ? `onclick="selectStop(event, this, ${svc.id}, ${stop.num})"` : ''} style="${stopPast || isDropoff ? 'opacity:0.5;cursor:default;' : ''}">
         <div class="stop-num">${stop.num}</div>
         <div class="stop-info">
           <div class="stop-name">${stop.name}</div>
           <div class="stop-addr">${stop.addr}</div>
         </div>
         <div class="stop-time">${formatTime(t)}</div>
-        ${stopPast ? '' : '<div class="stop-select-btn">Board here</div>'}
+        ${isDropoff ? '<div class="stop-select-btn" style="color:var(--h-muted);opacity:1;font-style:italic;">Drop-off only</div>' : (stopPast ? '' : '<div class="stop-select-btn">Board here</div>')}
       </div>`;
     });
 
@@ -699,10 +706,7 @@ function cancelBooking() {
 function switchTab(t) {
   document.getElementById('panelBook').style.display = t === 'book' ? 'block' : 'none';
   if (t === 'book') {
-    const btn = document.querySelector('#bookingForm .btn-gold');
-    if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
-    // Re-render with existing counts — do NOT reload from API to avoid flash
-    renderServices();
+    loadServices(); // Reload live seat data when switching back to book tab
   }
   document.getElementById('panelMy').style.display   = t === 'my'   ? 'block' : 'none';
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
@@ -1001,7 +1005,7 @@ async function submitReset() {
     setSession(token, verifyData.name, verifyData.isAdmin);
     window._resetEmail = null;
     goTo('bookingScreen');
-    loadServices();
+    loadStopDescriptions().then(() => loadServices());
     loadMyBookings();
   } catch (err) {
     showError('resetError', 'Unable to connect. Please try again.');
@@ -1146,6 +1150,25 @@ async function verifyOtp() {
 // Also wire the Verify button
 function verifyAndActivate() { verifyOtp(); }
 
+// ══ LOAD STOP DESCRIPTIONS from API ══
+async function loadStopDescriptions() {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const res = await fetch(API_BASE + '/api/get-stops', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.stops && data.stops.length) {
+      data.stops.forEach(s => {
+        const idx = STOPS.findIndex(st => st.num === s.num);
+        if (idx >= 0) { STOPS[idx].name = s.name; STOPS[idx].addr = s.addr; }
+      });
+    }
+  } catch(e) { /* non-fatal */ }
+}
+
 // ══ LOAD SERVICES from API ══
 async function loadServices() {
   const date  = document.getElementById('dateInput').value;
@@ -1174,6 +1197,7 @@ async function loadServices() {
         if (svc.times && svc.times.length >= 6) local.times = svc.times;
         local.disabled = svc.disabled === true;
         local.stopAvailability = svc.stopAvailability || {};
+        local.dropoffOnlyStops = svc.dropoffOnlyStops || [];
       }
     });
     renderServices();
@@ -1331,10 +1355,12 @@ function filterMyBookings() {
       s.toLocaleDateString('en-AU', { day:'numeric', month:'short' }) + ' – ' +
       e.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
     const days = Array.from({length:7}, (_,i) => addDays(weekStart, i));
-    const hasAny = days.some(d => _myBookings.some(b => b.travelDate === d));
-    if (!hasAny) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings this week.</div>'; return; }
+    const _sf = document.getElementById('myBookingFilter')?.value || 'Confirmed';
+    const _filtered = _sf === 'all' ? _myBookings : _myBookings.filter(b => _sf === 'Confirmed' ? !b.cancelled : b.cancelled);
+    const hasAny = days.some(d => _filtered.some(b => b.travelDate === d));
+    if (!hasAny) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this filter.</div>'; return; }
     list.innerHTML = days.map(day => {
-      const bks = _myBookings.filter(b => b.travelDate === day);
+      const bks = _filtered.filter(b => b.travelDate === day);
       if (!bks.length) return '';
       const isToday = day === _localTodayStr;
       return '<div style="margin-bottom:1rem;">' +
@@ -1345,8 +1371,9 @@ function filterMyBookings() {
   } else {
     const day = _myAnchor;
     document.getElementById('myPeriodLabel').textContent = fmtDay(day) + (day === _localTodayStr ? ' · Today' : '');
-    const bks = _myBookings.filter(b => b.travelDate === day);
-    if (!bks.length) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this day.</div>'; return; }
+    const _sfd = document.getElementById('myBookingFilter')?.value || 'Confirmed';
+    const bks = (_sfd === 'all' ? _myBookings : _myBookings.filter(b => _sfd === 'Confirmed' ? !b.cancelled : b.cancelled)).filter(b => b.travelDate === day);
+    if (!bks.length) { list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:14px;color:var(--h-muted);">No bookings for this filter.</div>'; return; }
     list.innerHTML = bks.map(b => bookingCardHTML(b)).join('');
   }
 }
@@ -1515,7 +1542,7 @@ _myAnchor = null; // will be set to this week's Monday on first filterMyBookings
     document.getElementById('navAvatar').textContent = initials;
     document.getElementById('avatarMenuAdmin').style.display = isAdmin ? 'block' : 'none';
     goTo('bookingScreen');
-    loadServices();
+    loadStopDescriptions().then(() => loadServices());
     loadMyBookings().then(() => {
       if (cancelRef) {
         const b = _myBookings.find(b => b.ref === cancelRef && !b.cancelled);
