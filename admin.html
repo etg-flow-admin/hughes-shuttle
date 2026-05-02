@@ -440,6 +440,29 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       </div>
     </div>
 
+    <!-- ── Stop descriptions editor ── -->
+    <div style="margin-top:2rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div class="page-title" style="font-size:16px;">Stop descriptions</div>
+          <div class="page-sub">Edit the name and address shown for each boarding stop.</div>
+        </div>
+        <button class="btn btn-gold btn-sm" onclick="saveStops()">Save stops</button>
+      </div>
+      <div class="modal-status" id="stops-status"></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th style="width:60px;">Stop</th>
+            <th>Name</th>
+            <th>Address / Description</th>
+          </tr></thead>
+          <tbody id="stops-tbody">
+            <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -859,7 +882,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
 }
 
 // ── Dashboard services ──
@@ -1129,9 +1152,8 @@ function renderBookings() {
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
 
-  // Render pagination
-  const bkExistingPag = document.getElementById('bk-pagination');
-  if (bkExistingPag) bkExistingPag.remove();
+  const bkExPag = document.getElementById('bk-pagination');
+  if (bkExPag) bkExPag.remove();
   if (bkTotalPages > 1) {
     const pag = document.createElement('div');
     pag.id = 'bk-pagination';
@@ -1384,6 +1406,44 @@ document.addEventListener('click', function(e) {
 });
 
 // Set admin initials from session
+// ── Stop descriptions ──
+let _stops = [];
+const STOP_DEFAULTS = [
+  { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
+  { num:2, name:'City Campus West',            addr:'Medical School' },
+  { num:3, name:'Bus Interchange Centre',      addr:'Stop W2 King William St - West side' },
+  { num:4, name:'Bus Interchange Centre',      addr:'Stop C3 King William St - East side' },
+  { num:5, name:'City Campus East',            addr:'Business School' },
+  { num:6, name:'Central Market & Chinatown',  addr:'Stop W2 Grote St - South side' },
+  { num:7, name:'Adelaide University Village', addr:'Return - 210 Grote St' },
+];
+async function loadStops() {
+  try {
+    const res = await authFetch('/api/get-stops');
+    _stops = (res && res.ok) ? (await res.json()).stops || STOP_DEFAULTS : [...STOP_DEFAULTS];
+  } catch(e) { _stops = [...STOP_DEFAULTS]; }
+  renderStopsTable();
+}
+function renderStopsTable() {
+  const tbody = document.getElementById('stops-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = _stops.map(s => `<tr>
+    <td><div style="width:28px;height:28px;border-radius:50%;background:var(--gold-pale);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);">${s.num}</div></td>
+    <td><input class="modal-input" id="stop-name-${s.num}" value="${esc(s.name)}" style="width:100%;"></td>
+    <td><input class="modal-input" id="stop-addr-${s.num}" value="${esc(s.addr)}" style="width:100%;"></td>
+  </tr>`).join('');
+}
+async function saveStops() {
+  const updated = _stops.map(s => ({
+    num:  s.num,
+    name: document.getElementById('stop-name-' + s.num)?.value.trim() || s.name,
+    addr: document.getElementById('stop-addr-' + s.num)?.value.trim() || s.addr,
+  }));
+  const res = await authFetch('/api/mgmt-update-stops', { method:'POST', body: JSON.stringify({ stops: updated }) });
+  showStatus('stops-status', res && res.ok ? 'Stop descriptions saved.' : 'Failed to save.', res && res.ok ? 'success' : 'error');
+  if (res && res.ok) _stops = updated;
+}
+
 function setAdminAvatar() {
   const name = localStorage.getItem('hs_name') || 'Admin';
   const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'AD';
