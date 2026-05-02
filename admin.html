@@ -1321,7 +1321,7 @@ function openEditSchedule(svcId) {
         <input type="checkbox" id="sched-ns-${i}" ${isNS?'checked':''} onchange="toggleNS(${i})">
         Not serviced
       </label>
-      <label class="sched-ns-label" style="margin-left:8px;${isNS?'opacity:0.4;pointer-events:none;':''}">
+      <label class="sched-ns-label" style="margin-left:8px;">
         <input type="checkbox" id="sched-do-${i}" ${isDO?'checked':''} ${isNS?'disabled':''}>
         Drop-off only
       </label>
