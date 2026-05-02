@@ -744,7 +744,7 @@ async function init() {
 async function loadDashboard() {
   setAdminAvatar();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  document.getElementById('booking-date-filter').value = today();
+  // No default date filter — show all bookings
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
@@ -1067,7 +1067,7 @@ async function submitAddUser() {
   const isAdmin= document.getElementById('add-is-admin').checked;
   const s      = document.getElementById('add-status');
   if (!email) {
-    showStatus('add-status', 'Email address is required.', 'error'); return;
+    showStatus('add-status', 'Name and email address are required.', 'error'); return;
   }
   if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
     showStatus('add-status', 'Please enter a valid email address.', 'error'); return;
@@ -1109,9 +1109,26 @@ function renderBookings() {
     (stF  === 'all' || b.status === stF)
   );
   document.getElementById('booking-count').textContent = bks.length + ' booking' + (bks.length !== 1 ? 's' : '');
+  window._bkPage = window._bkPage || 1;
   const tbody = document.getElementById('booking-tbody');
   if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found.</td></tr>'; return; }
-  tbody.innerHTML = bks.map(b => `<tr>
+  // Pagination — 20 per page
+  const PAGE_SIZE = 20;
+  const totalPages = Math.ceil(bks.length / PAGE_SIZE);
+  if (!window._bkPage || window._bkPage > totalPages) window._bkPage = 1;
+  const pageBks = bks.slice((window._bkPage - 1) * PAGE_SIZE, window._bkPage * PAGE_SIZE);
+
+  // Render pagination controls
+  let pagHtml = '';
+  if (totalPages > 1) {
+    pagHtml = '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:0.75rem;font-size:13px;">';
+    pagHtml += `<span style="color:var(--muted);">Page ${window._bkPage} of ${totalPages}</span>`;
+    if (window._bkPage > 1) pagHtml += `<button class="btn btn-outline btn-sm" onclick="window._bkPage--;renderBookings()">&#8249; Prev</button>`;
+    if (window._bkPage < totalPages) pagHtml += `<button class="btn btn-outline btn-sm" onclick="window._bkPage++;renderBookings()">Next &#8250;</button>`;
+    pagHtml += '</div>';
+  }
+
+  tbody.innerHTML = pageBks.map(b => `<tr>
     <td><span class="ref-code">${b.ref}</span></td>
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
@@ -1122,6 +1139,18 @@ function renderBookings() {
     <td class="muted">${b.bookedAt}</td>
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
+  // Append pagination
+  const pagDiv = document.createElement('div');
+  pagDiv.innerHTML = pagHtml;
+  const wrap = document.getElementById('booking-tbody')?.closest('.table-wrap');
+  const existing = wrap?.parentElement?.querySelector('.bk-pagination');
+  if (existing) existing.remove();
+  if (pagHtml && wrap) {
+    const pd = document.createElement('div');
+    pd.className = 'bk-pagination';
+    pd.innerHTML = pagHtml;
+    wrap.parentElement.appendChild(pd);
+  }
 }
 
 async function reloadHistory() {

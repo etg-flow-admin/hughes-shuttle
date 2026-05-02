@@ -539,8 +539,18 @@ function renderServices() {
   grid.innerHTML = '';
   document.getElementById('bookingForm').style.display = 'none';
 
+  // Block weekends
+  const _dateCheck = document.getElementById('dateInput').value;
+  if (_dateCheck) {
+    const _d = new Date(_dateCheck + 'T12:00');
+    if (_d.getDay() === 0 || _d.getDay() === 6) {
+      grid.innerHTML = '<div style="text-align:center;padding:2rem 1rem;font-size:14px;color:var(--h-muted);background:var(--h-white);border-radius:9px;border:0.5px solid var(--h-border-sub);">Services are not available on weekends.</div>';
+      return;
+    }
+  }
+
   SERVICES.forEach(svc => {
-    if (svc.disabled) return; // service disabled by admin
+    if (svc.disabled) return;
     const visible = fStop === 'all'
       ? STOPS.some((_, i) => svc.times[i] !== '*N/S')
       : svc.times[+fStop - 1] !== '*N/S';
@@ -611,7 +621,7 @@ function selectStop(event, rowEl, svcId, stopNum) {
   window._selectedFStop  = String(stopNum);
   window._selectedAlight = null;
 
-  // Build alighting stop options — stops AFTER boarding that are active on this service
+  // Build alighting stops — only stops AFTER boarding that are active
   const activeAfter = STOPS
     .map((s, i) => ({ ...s, time: svc.times[i] }))
     .filter(s => s.time && s.time !== '*N/S' && s.num > stopNum);
@@ -631,13 +641,17 @@ function selectStop(event, rowEl, svcId, stopNum) {
   const f = document.getElementById('bookingForm');
   f.style.display = 'block';
   const btn = document.querySelector('#bookingForm .btn-gold');
-  if (btn) { btn.disabled = true; btn.textContent = 'Select getting off stop'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Select getting off stop first'; }
   f.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 function onAlightingSelected() {
   const alightNum = +document.getElementById('alightingSelect').value;
-  if (!alightNum) return;
+  if (!alightNum) {
+    const btn = document.querySelector('#bookingForm .btn-gold');
+    if (btn) { btn.disabled = true; btn.textContent = 'Select getting off stop first'; }
+    return;
+  }
   const svc    = window._selectedSvc;
   const alight = STOPS[alightNum - 1];
   document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;

@@ -28,11 +28,15 @@ module.exports = wrapHandler('cancel-booking', async function (context, req) {
       CancelledAt: new Date().toISOString(),
     });
 
-    // Free segments in Table Storage
+    // Free segments in Table Storage (only if AlightingStop is set — old bookings may not have it)
     const boardingStop  = +booking.StopNumber;
     const alightingStop = +booking.AlightingStop;
     if (boardingStop && alightingStop && boardingStop < alightingStop) {
-      await cancelSeat(booking.TravelDate, +booking.ServiceNumber, boardingStop, alightingStop);
+      try {
+        await cancelSeat(booking.TravelDate, +booking.ServiceNumber, boardingStop, alightingStop);
+      } catch(segErr) {
+        context.log.warn('cancel-booking: segment release failed (non-fatal):', segErr.message);
+      }
     }
 
     context.log.info(`cancel-booking: ${payload.email} cancelled ${ref}`);
