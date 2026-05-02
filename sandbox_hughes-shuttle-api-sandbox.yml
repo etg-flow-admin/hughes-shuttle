@@ -13,13 +13,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: Checkout GitHub Action
         uses: actions/checkout@v4
-      - name: Setup Node ${{ env.NODE_VERSION }} Environment
+      - name: Setup Node Environment
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: 'Resolve Project Dependencies Using Npm'
+      - name: Resolve Project Dependencies Using Npm
         shell: bash
         run: |
           pushd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
@@ -57,7 +57,7 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_B26087176C774779B3DD64CCB4647AE9 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DA839223BF594D29B27B414C2FAE5369 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8061B574DDC54910B1E8FC9FD016FE07 }}
-      - name: 'Run Azure Functions Action'
+      - name: Run Azure Functions Action
         uses: Azure/functions-action@v1
         id: fa
         with:
