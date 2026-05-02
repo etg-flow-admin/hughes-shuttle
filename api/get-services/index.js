@@ -1,4 +1,4 @@
-// GET /api/get-services?date=YYYY-MM-DD
+// GET /api/get-services?date=YYYY-MM-DD&includeDisabled=true
 const { verifyToken, authError }  = require('../shared/auth');
 const { wrapHandler }             = require('../shared/logger');
 const { getListItems }            = require('../shared/msLists');
@@ -7,7 +7,9 @@ const { getAvailabilityForDate, getStopAvailability, CAPACITY } = require('../sh
 module.exports = wrapHandler('get-services', async function (context, req) {
   try { await verifyToken(req); } catch (err) { authError(context, err); return; }
 
-  const travelDate = req.query && req.query.date;
+  const travelDate      = req.query && req.query.date;
+  const includeDisabled = req.query && req.query.includeDisabled === 'true';
+
   if (!travelDate) {
     context.res = { status: 400, body: { error: 'date query parameter required (YYYY-MM-DD).' } }; return;
   }
@@ -23,7 +25,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
 
     const services = await Promise.all(
       scheduleItems
-        .filter(s => !s.IsDisabled)
+        .filter(s => includeDisabled || !s.IsDisabled)
         .sort((a, b) => a.ServiceNumber - b.ServiceNumber)
         .map(async s => {
           const svcNum = s.ServiceNumber;
@@ -36,16 +38,14 @@ module.exports = wrapHandler('get-services', async function (context, req) {
             s.Stop6Time || '*N/S',
             s.Stop7Time || '*N/S',
           ];
-
-          // Parse drop-off only stops — stored as "7" or "5,7"
           const dropoffOnlyStops = (s.DropoffOnlyStops || '')
-            .split(',')
-            .map(n => parseInt(n.trim()))
-            .filter(n => !isNaN(n));
+            .split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
 
           const activeStops = times.map((t, i) => t !== '*N/S' ? i + 1 : null).filter(Boolean);
           const avail       = availability[svcNum] || { segments: {}, maxOnBoard: 0 };
-          const stopAvail   = await getStopAvailability(travelDate, svcNum, activeStops);
+          const stopAvail   = activeStops.length > 0
+            ? await getStopAvailability(travelDate, svcNum, activeStops)
+            : {};
 
           return {
             id:               svcNum,
@@ -57,6 +57,7 @@ module.exports = wrapHandler('get-services', async function (context, req) {
             stopAvailability: stopAvail,
             segments:         avail.segments || {},
             dropoffOnlyStops,
+            disabled:         s.IsDisabled === true,
           };
         })
     );

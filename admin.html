@@ -808,7 +808,7 @@ async function loadUsers() {
 
 // ── Load services + live seat counts ──
 async function loadServices() {
-  const res = await authFetch('/api/get-services?date=' + today());
+  const res = await authFetch('/api/get-services?date=' + today() + '&includeDisabled=true');
   if (!res || !res.ok) return;
   const data = await res.json();
   (data.services || []).forEach(svc => {
@@ -1309,7 +1309,7 @@ async function cancelBooking() {
 function renderServicesPanel() {
   const totalBooked = SERVICES.reduce((a,s) => a+s.booked, 0);
   document.getElementById('svc-booked-total').textContent = totalBooked;
-  document.getElementById('svc-avail-total').textContent  = CAP*9 - totalBooked;
+  document.getElementById('svc-avail-total').textContent  = CAP*SERVICES.length - totalBooked;
   const tbody = document.getElementById('svc-tbody');
   tbody.innerHTML = SERVICES.map(s => {
     const left = CAP - s.booked;
