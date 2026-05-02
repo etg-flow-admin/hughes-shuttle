@@ -2,7 +2,6 @@
 // Segment-based seat booking using Azure Table Storage
 // RowKey format: "{serviceNumber}-{stopNumber}"
 // Each row tracks passengers ON BOARD departing that stop
-// Booking Stop A to Stop B touches segments A, A+1, ... B-1
 
 const { TableClient, TableServiceClient } = require('@azure/data-tables');
 const { getSecret } = require('./keyVault');
@@ -113,15 +112,18 @@ async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) 
         const rk     = `${serviceNumber}-${stop}`;
         const onBoard = (entities[stop]?.onBoard || 0) + 1;
         const entity  = { partitionKey: pk, rowKey: rk, onBoard };
-        return entities[stop]
-          ? ['update', entity, { etag: entities[stop].etag, mode: 'Replace' }]
-          : ['create', entity];
+        if (entities[stop]) {
+          // Use Merge mode to avoid wiping unknown fields, match on etag
+          return ['update', entity, { etag: entities[stop]['odata.etag'] || entities[stop].etag || '*', mode: 'Merge' }];
+        } else {
+          return ['create', entity];
+        }
       });
       await client.submitTransaction(actions);
       const seatsLeft = CAPACITY - Math.max(...segStops.map(s => (entities[s]?.onBoard || 0) + 1));
       return { success: true, seatsLeft: Math.max(0, seatsLeft) };
     } catch (e) {
-      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied')) continue;
+      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied') || e.message?.includes('412')) continue;
       throw e;
     }
   }
@@ -134,6 +136,8 @@ async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop
   const segStops = [];
   for (let s = boardingStop; s < alightingStop; s++) segStops.push(s);
 
+  if (segStops.length === 0) return { success: true };
+
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const entities = {};
@@ -145,20 +149,24 @@ async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop
         else throw e;
       }
     }
+
+    // Filter to stops that actually have data and onBoard > 0
+    const toUpdate = segStops.filter(stop => entities[stop] && (entities[stop].onBoard || 0) > 0);
+    if (toUpdate.length === 0) return { success: true }; // already at 0
+
     try {
-      const actions = segStops
-        .filter(stop => entities[stop] && (entities[stop].onBoard || 0) > 0)
-        .map(stop => {
-          const onBoard = Math.max(0, (entities[stop].onBoard || 0) - 1);
-          return ['update',
-            { partitionKey: pk, rowKey: `${serviceNumber}-${stop}`, onBoard },
-            { etag: entities[stop].etag, mode: 'Replace' }
-          ];
-        });
-      if (actions.length) await client.submitTransaction(actions);
+      const actions = toUpdate.map(stop => {
+        const onBoard = Math.max(0, (entities[stop].onBoard || 0) - 1);
+        const etag    = entities[stop]['odata.etag'] || entities[stop].etag || '*';
+        return ['update',
+          { partitionKey: pk, rowKey: `${serviceNumber}-${stop}`, onBoard },
+          { etag, mode: 'Merge' }
+        ];
+      });
+      await client.submitTransaction(actions);
       return { success: true };
     } catch (e) {
-      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied')) continue;
+      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied') || e.message?.includes('412')) continue;
       throw e;
     }
   }

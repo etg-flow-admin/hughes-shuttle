@@ -694,10 +694,8 @@ function cancelBooking() {
 function switchTab(t) {
   document.getElementById('panelBook').style.display = t === 'book' ? 'block' : 'none';
   if (t === 'book') {
-    const btn = document.querySelector('#bookingForm .btn-gold');
-    if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
-    // Re-render with existing counts — do NOT reload from API to avoid flash
-    renderServices();
+    // Reload live seat data from API when switching back to book tab
+    loadServices();
   }
   document.getElementById('panelMy').style.display   = t === 'my'   ? 'block' : 'none';
   document.getElementById('tabBook').className = 'tab' + (t === 'book' ? ' active' : '');
