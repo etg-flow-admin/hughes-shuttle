@@ -265,4 +265,45 @@ function passwordResetTemplate(name, otp) {
   return emailWrapper(content);
 }
 
+function scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops, changedBy) {
+  const STOP_NAMES = [
+    'Adelaide University Village', 'City Campus West', 'Bus Interchange Centre',
+    'Bus Interchange Centre', 'City Campus East', 'Central Market & Chinatown',
+    'Adelaide University Village (Return)'
+  ];
+  const stopRows = times.map((t, i) => {
+    const isNS = t === '*N/S' || !t;
+    const isDO = (dropoffOnlyStops || []).includes(i + 1);
+    const label = isNS ? '<span style="color:#9CA3AF;">Not serviced</span>'
+                       : isDO ? `${formatEmailTime(t)} <span style="color:#9CA3AF;font-size:11px;">(Drop-off only)</span>`
+                              : formatEmailTime(t);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:${i%2===0?'#ffffff':'#F8F6F1'};font-size:13px;">
+      <span style="color:#6B7280;min-width:60px;">Stop ${i+1}</span>
+      <span style="flex:1;color:#1A2340;">${STOP_NAMES[i] || ''}</span>
+      <span style="color:#1A2340;font-weight:600;min-width:80px;text-align:right;">${label}</span>
+    </div>`;
+  }).join('');
+
+  const content = `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+      <tr><td align="center">
+        <p style="font-family:Arial,sans-serif;font-size:18px;font-weight:700;color:#1A2340;margin:0 0 4px;">Schedule Updated</p>
+        <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;margin:0;">Service No.${serviceNumber} has been updated</p>
+      </td></tr>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#E5E7EB;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+      <tr style="background:#1A2340;">
+        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;">Stop</td>
+        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;">Location</td>
+        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;text-align:right;">Time</td>
+      </tr>
+      ${stopRows}
+    </table>
+    <p style="font-family:Arial,sans-serif;font-size:12px;color:#9CA3AF;text-align:center;margin:0;">
+      Changed by ${changedBy} &middot; ${new Date().toLocaleString('en-AU', { timeZone:'Australia/Adelaide', dateStyle:'medium', timeStyle:'short' })}
+    </p>`;
+  return emailWrapper(content);
+}
+
 module.exports = { sendEmail, otpTemplate, passwordResetTemplate, welcomeTemplate, bookingConfirmTemplate };
