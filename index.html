@@ -126,6 +126,36 @@
 
   /* ── My bookings ── */
   .my-booking-card { background: var(--h-white); border: 0.5px solid var(--h-border-sub); border-radius: 9px; padding: 1rem 1.1rem; margin-bottom: 10px; }
+  /* ── Custom alighting dropdown ── */
+  .alight-dropdown { position:relative; width:100%; margin-bottom:0.75rem; }
+  .alight-dropdown-btn {
+    width:100%; padding:12px 14px; border-radius:8px; cursor:pointer;
+    border:2px solid var(--h-gold); background:var(--h-white);
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:14px; font-weight:600; color:var(--h-navy); font-family:inherit;
+    transition:background 0.15s;
+  }
+  .alight-dropdown-btn:hover { background:var(--h-offwhite); }
+  .alight-dropdown-btn .alight-placeholder { color:var(--h-muted); font-weight:400; }
+  .alight-dropdown-btn .alight-arrow { font-size:10px; color:var(--h-gold); transition:transform 0.2s; flex-shrink:0; }
+  .alight-dropdown-btn.open .alight-arrow { transform:rotate(180deg); }
+  .alight-dropdown-list {
+    position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:999;
+    background:var(--h-white); border:1.5px solid var(--h-gold); border-radius:8px;
+    box-shadow:0 8px 24px rgba(26,35,64,0.15); overflow:hidden; display:none;
+  }
+  .alight-dropdown-list.open { display:block; }
+  .alight-dropdown-option {
+    padding:12px 16px; cursor:pointer; display:flex; justify-content:space-between;
+    align-items:center; font-size:13px; color:var(--h-navy); border-bottom:0.5px solid var(--h-border-sub);
+    transition:background 0.1s;
+  }
+  .alight-dropdown-option:last-child { border-bottom:none; }
+  .alight-dropdown-option:hover { background:var(--h-offwhite); }
+  .alight-dropdown-option.selected { background:#EAF3DE; }
+  .alight-dropdown-option .opt-name { font-weight:600; }
+  .alight-dropdown-option .opt-time { font-size:12px; color:var(--h-muted); flex-shrink:0; margin-left:8px; }
+
   .bk-table { display:flex; flex-direction:column; }
   .bk-row { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-bottom:0.5px solid var(--h-border-sub); font-size:13px; gap:12px; }
   .bk-row:last-child { border-bottom:none; }
@@ -618,19 +648,32 @@ function selectStop(event, rowEl, svcId, stopNum) {
   window._selectedFStop  = String(stopNum);
   window._selectedAlight = null;
 
+  // Build alighting options
   const activeAfter = STOPS
     .map((s, i) => ({ ...s, time: svc.times[i] }))
     .filter(s => s.time && s.time !== '*N/S' && s.num > stopNum);
 
-  const alightOptions = '<option value="">— Select getting off stop —</option>' +
-    activeAfter.map(s => `<option value="${s.num}">Stop ${s.num} – ${s.name} (${formatTime(s.time)})</option>`).join('');
+  const optionsHTML = activeAfter.map(s => `
+    <div class="alight-dropdown-option" data-num="${s.num}" data-name="${s.name}" data-time="${formatTime(s.time)}"
+         onclick="pickAlightStop(${s.num}, '${s.name.replace(/'/g,"\'")}', '${formatTime(s.time)}')">
+      <span class="opt-name">Stop ${s.num} – ${s.name}</span>
+      <span class="opt-time">${formatTime(s.time)}</span>
+    </div>`).join('');
 
   const card = rowEl.closest('.service-card');
   card.insertAdjacentHTML('beforeend', `<div class="booking-form booking-form-injected" style="margin-top:0.75rem;border-top:0.5px solid var(--h-border-sub);padding-top:0.75rem;">
     <p class="form-title" style="margin-bottom:0.75rem;">Complete your booking</p>
     <div class="field" style="margin-bottom:0.75rem;">
-      <label style="font-size:11px;font-weight:700;color:var(--h-navy);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:5px;">Getting off at *</label>
-      <select class="inp" id="alightingSelect" onchange="onAlightingSelected()" style="font-size:13px;">${alightOptions}</select>
+      <label style="font-size:11px;font-weight:700;color:var(--h-gold);letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:6px;">Getting off at *</label>
+      <div class="alight-dropdown" id="alightDropdown">
+        <button type="button" class="alight-dropdown-btn open" id="alightDropdownBtn" onclick="toggleAlightDropdown()">
+          <span id="alightDropdownLabel" class="alight-placeholder">— Select getting off stop —</span>
+          <span class="alight-arrow">&#9660;</span>
+        </button>
+        <div class="alight-dropdown-list open" id="alightDropdownList">
+          ${optionsHTML}
+        </div>
+      </div>
     </div>
     <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val">Service No.${svc.id}</span></div>
     <div class="sum-row"><span class="sum-key">Getting on at</span><span class="sum-val">Stop ${stop.num} – ${stop.name}</span></div>
@@ -641,40 +684,69 @@ function selectStop(event, rowEl, svcId, stopNum) {
     <button id="bookingConfirmBtn" class="btn-gold" style="margin-top:0.5rem;opacity:0.5;pointer-events:none;" onclick="confirmBooking()">Select getting off stop first</button>
     <button class="btn-ghost" onclick="cancelBooking()" style="margin-top:0.5rem;">Cancel</button>
   </div>`);
+
+  // Close dropdown when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', closeAlightDropdownOnOutside, { once: false });
+  }, 0);
+
   card.querySelector('.booking-form-injected').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
-function onAlightingSelected() {
-  const alightNum = +document.getElementById('alightingSelect').value;
-  const btn = document.getElementById('bookingConfirmBtn');
-  if (!alightNum) {
-    if (btn) { btn.style.opacity='0.5'; btn.style.pointerEvents='none'; btn.textContent='Select getting off stop first'; }
-    document.getElementById('sumAlight').textContent = '—';
-    document.getElementById('sumSeatsRow').style.display = 'none';
-    window._selectedAlight = null;
-    return;
-  }
-  const svc      = window._selectedSvc;
-  const alight   = STOPS[alightNum - 1];
-  const boardNum = window._selectedStop.num;
-  document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;
-  window._selectedAlight = alight;
+function toggleAlightDropdown() {
+  const btn  = document.getElementById('alightDropdownBtn');
+  const list = document.getElementById('alightDropdownList');
+  if (!btn || !list) return;
+  btn.classList.toggle('open');
+  list.classList.toggle('open');
+}
 
-  // Calculate availability for exact segment range boardNum → alightNum-1
-  // segments keys may be numbers or strings depending on API
+function closeAlightDropdownOnOutside(e) {
+  const dropdown = document.getElementById('alightDropdown');
+  if (!dropdown) { document.removeEventListener('click', closeAlightDropdownOnOutside); return; }
+  if (!dropdown.contains(e.target)) {
+    document.getElementById('alightDropdownBtn')?.classList.remove('open');
+    document.getElementById('alightDropdownList')?.classList.remove('open');
+  }
+}
+
+function pickAlightStop(num, name, time) {
+  // Close dropdown
+  document.getElementById('alightDropdownBtn')?.classList.remove('open');
+  document.getElementById('alightDropdownList')?.classList.remove('open');
+
+  // Update button label
+  const label = document.getElementById('alightDropdownLabel');
+  if (label) { label.textContent = 'Stop ' + num + ' – ' + name; label.classList.remove('alight-placeholder'); }
+
+  // Mark selected option
+  document.querySelectorAll('.alight-dropdown-option').forEach(o => {
+    o.classList.toggle('selected', +o.dataset.num === num);
+  });
+
+  // Update summary
+  document.getElementById('sumAlight').textContent = 'Stop ' + num + ' – ' + name;
+  window._selectedAlight = STOPS[num - 1] || { num, name };
+
+  // Calculate availability for exact segment
+  const svc      = window._selectedSvc;
+  const boardNum = window._selectedStop.num;
   const segments = svc.segments || {};
   let maxOccupancy = 0;
-  for (let s = boardNum; s < alightNum; s++) {
+  for (let s = boardNum; s < num; s++) {
     const val = segments[s] !== undefined ? segments[s] : (segments[String(s)] !== undefined ? segments[String(s)] : 0);
     maxOccupancy = Math.max(maxOccupancy, +val || 0);
   }
   const avail = Math.max(0, CAP - maxOccupancy);
-
   document.getElementById('sumSeats').textContent = avail + ' seat' + (avail !== 1 ? 's' : '') + ' available for your journey';
   document.getElementById('sumSeatsRow').style.display = '';
+
+  const btn = document.getElementById('bookingConfirmBtn');
   if (btn) { btn.style.opacity='1'; btn.style.pointerEvents=''; btn.textContent='Confirm booking'; }
 }
 
+
+function onAlightingSelected() { /* handled by pickAlightStop */ }
 
 function selectSvc(el, svc, fStop) {
   // Legacy — redirect to first active stop
