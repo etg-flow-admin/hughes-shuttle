@@ -1,6 +1,10 @@
 {
   "routes": [
     {
+      "route": "/api/*",
+      "rewrite": "https://hughes-shuttle-api-sandbox-cvdqayg2geangkhh.australiaeast-01.azurewebsites.net/api/*"
+    },
+    {
       "route": "/*.html",
       "headers": {
         "cache-control": "no-cache, no-store, must-revalidate"
