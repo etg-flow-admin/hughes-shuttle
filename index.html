@@ -416,6 +416,7 @@
             </select>
           </div>
         </div>
+        <p id="serviceDateLabel" style="font-size:15px;font-weight:700;color:var(--h-navy);margin-bottom:4px;"></p>
         <p class="sel-label">Select a service</p>
         <div id="serviceGrid"></div>
 
@@ -528,14 +529,10 @@ function renderServices() {
   grid.innerHTML = '';
   document.getElementById('bookingForm').style.display = 'none';
 
-  // Block weekends
   const _dateCheck = document.getElementById('dateInput').value;
-  if (_dateCheck) {
-    const _d = new Date(_dateCheck + 'T12:00');
-    if (_d.getDay() === 0 || _d.getDay() === 6) {
-      grid.innerHTML = '<div style="text-align:center;padding:2rem 1rem;font-size:14px;color:var(--h-muted);background:var(--h-white);border-radius:9px;border:0.5px solid var(--h-border-sub);">Services are not available on weekends.</div>';
-      return;
-    }
+  if (_dateCheck && isWeekend(_dateCheck)) {
+    grid.innerHTML = '<div style="text-align:center;padding:2rem 1rem;font-size:14px;color:var(--h-muted);background:var(--h-white);border-radius:9px;border:0.5px solid var(--h-border-sub);">Services are not available on weekends.</div>';
+    return;
   }
 
   SERVICES.forEach(svc => {
@@ -593,14 +590,13 @@ function selectStop(event, rowEl, svcId, stopNum) {
   event.stopPropagation();
   const svc = SERVICES.find(s => s.id === svcId);
   if (!svc) return;
-
   const stop = STOPS[stopNum - 1];
 
   // Highlight selected boarding stop row
   document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
   rowEl.classList.add('stop-selected');
 
-  // Remove any existing injected form
+  // Remove any existing injected booking form
   document.querySelectorAll('.booking-form-injected').forEach(el => el.remove());
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   rowEl.closest('.service-card').classList.add('selected');
@@ -610,7 +606,7 @@ function selectStop(event, rowEl, svcId, stopNum) {
   window._selectedFStop  = String(stopNum);
   window._selectedAlight = null;
 
-  // Build alighting stop options — stops AFTER boarding that are active
+  // Build alighting options — stops AFTER boarding that are active
   const activeAfter = STOPS
     .map((s, i) => ({ ...s, time: svc.times[i] }))
     .filter(s => s.time && s.time !== '*N/S' && s.num > stopNum);
@@ -618,7 +614,6 @@ function selectStop(event, rowEl, svcId, stopNum) {
   const alightOptions = '<option value="">— Select getting off stop —</option>' +
     activeAfter.map(s => `<option value="${s.num}">Stop ${s.num} – ${s.name} (${formatTime(s.time)})</option>`).join('');
 
-  // Inject booking form directly inside the card
   const card = rowEl.closest('.service-card');
   const formHtml = `<div class="booking-form booking-form-injected" style="margin-top:0.75rem;border-top:0.5px solid var(--h-border-sub);padding-top:0.75rem;">
     <p class="form-title" style="margin-bottom:0.75rem;">Complete your booking</p>
@@ -626,13 +621,13 @@ function selectStop(event, rowEl, svcId, stopNum) {
       <label style="font-size:11px;font-weight:700;color:var(--h-navy);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:5px;">Getting off at *</label>
       <select class="inp" id="alightingSelect" onchange="onAlightingSelected()" style="font-size:13px;">${alightOptions}</select>
     </div>
-    <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val" id="sumService">Service No.${svc.id}</span></div>
-    <div class="sum-row"><span class="sum-key">Getting on at</span><span class="sum-val" id="sumStop">Stop ${stop.num} – ${stop.name}</span></div>
+    <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val">Service No.${svc.id}</span></div>
+    <div class="sum-row"><span class="sum-key">Getting on at</span><span class="sum-val">Stop ${stop.num} – ${stop.name}</span></div>
     <div class="sum-row"><span class="sum-key">Getting off at</span><span class="sum-val" id="sumAlight">—</span></div>
-    <div class="sum-row"><span class="sum-key">Departure</span><span class="sum-val" id="sumTime">${formatTime(svc.times[stopNum - 1])}</span></div>
+    <div class="sum-row"><span class="sum-key">Departure</span><span class="sum-val">${formatTime(svc.times[stopNum - 1])}</span></div>
     <div class="sum-row" id="sumSeatsRow" style="display:none;"><span class="sum-key">Seats available</span><span class="sum-val" id="sumSeats" style="color:#3B6D11;"></span></div>
     <div id="bookingError" style="display:none;background:#FCEBEB;border:0.5px solid #F09595;border-radius:7px;padding:11px 13px;font-size:13px;color:#A32D2D;margin-bottom:0.75rem;"></div>
-    <button class="btn-gold" id="bookingConfirmBtn" style="margin-top:0.5rem;opacity:0.5;pointer-events:none;" onclick="confirmBooking()">Select getting off stop first</button>
+    <button id="bookingConfirmBtn" class="btn-gold" style="margin-top:0.5rem;opacity:0.5;pointer-events:none;" onclick="confirmBooking()">Select getting off stop first</button>
     <button class="btn-ghost" onclick="cancelBooking()" style="margin-top:0.5rem;">Cancel</button>
   </div>`;
 
@@ -644,23 +639,20 @@ function onAlightingSelected() {
   const alightNum = +document.getElementById('alightingSelect').value;
   const btn = document.getElementById('bookingConfirmBtn');
   if (!alightNum) {
+    if (btn) { btn.style.opacity='0.5'; btn.style.pointerEvents='none'; btn.textContent='Select getting off stop first'; }
     document.getElementById('sumAlight').textContent = '—';
     document.getElementById('sumSeatsRow').style.display = 'none';
     window._selectedAlight = null;
-    if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; btn.textContent = 'Select getting off stop first'; }
     return;
   }
   const svc    = window._selectedSvc;
   const alight = STOPS[alightNum - 1];
   document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;
   window._selectedAlight = alight;
-
-  // Now show seat availability for this specific boarding stop
   const avail = (svc.stopAvailability || {})[window._selectedStop.num] ?? (CAP - svc.booked);
   document.getElementById('sumSeats').textContent = avail + ' of ' + CAP + ' available';
   document.getElementById('sumSeatsRow').style.display = '';
-
-  if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; btn.textContent = 'Confirm booking'; }
+  if (btn) { btn.style.opacity='1'; btn.style.pointerEvents=''; btn.textContent='Confirm booking'; }
 }
 
 
@@ -693,7 +685,6 @@ function confirmBooking() {
 
 
 function cancelBooking() {
-  // Remove injected booking forms
   document.querySelectorAll('.booking-form-injected').forEach(el => el.remove());
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
@@ -1154,6 +1145,7 @@ function verifyAndActivate() { verifyOtp(); }
 async function loadServices() {
   const date  = document.getElementById('dateInput').value;
   if (!date) return;
+  updateServiceDateLabel(date);
   const token = getToken();
   if (!token) return;
 
@@ -1280,8 +1272,12 @@ async function loadMyBookings() {
       if (a.cancelled !== b.cancelled) return a.cancelled ? 1 : -1;
       return 0;
     });
-    // Default anchor to this week
-    if (!_myAnchor) _myAnchor = getMondayOf(_localTodayStr);
+    // Default to next week if today is weekend
+    if (!_myAnchor) {
+      _myAnchor = isWeekend(_localTodayStr)
+        ? getMondayOf(nextWeekday(_localTodayStr))
+        : getMondayOf(_localTodayStr);
+    }
     filterMyBookings();
   } catch (err) { /* silently fail */ }
 }
@@ -1441,7 +1437,31 @@ const _localToday   = new Date();
 const _localTodayStr = _localToday.getFullYear() + '-' +
   String(_localToday.getMonth() + 1).padStart(2, '0') + '-' +
   String(_localToday.getDate()).padStart(2, '0');
-document.getElementById('dateInput').value = _localTodayStr;
+
+function isWeekend(isoStr) {
+  const d = new Date(isoStr + 'T12:00');
+  return d.getDay() === 0 || d.getDay() === 6;
+}
+function nextWeekday(isoStr) {
+  const d = new Date(isoStr + 'T12:00');
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function prevWeekday(isoStr) {
+  const d = new Date(isoStr + 'T12:00');
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function updateServiceDateLabel(isoStr) {
+  const el = document.getElementById('serviceDateLabel');
+  if (!el || !isoStr) return;
+  const d = new Date(isoStr + 'T12:00');
+  el.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+
+// Default to next weekday if today is weekend
+const _startDate = isWeekend(_localTodayStr) ? nextWeekday(_localTodayStr) : _localTodayStr;
+document.getElementById('dateInput').value = _startDate;
 // Restrict booking to 7 days in advance
 const _maxBookingDate = new Date(_localToday);
 _maxBookingDate.setDate(_maxBookingDate.getDate() + 7);
@@ -1450,7 +1470,7 @@ const _maxDateStr = _maxBookingDate.getFullYear() + '-' +
   String(_maxBookingDate.getDate()).padStart(2, '0');
 document.getElementById('dateInput').min = _localTodayStr;
 document.getElementById('dateInput').max = _maxDateStr;
-_myAnchor = null; // will be set to this week's Monday on first filterMyBookings call
+_myAnchor = null; // set on first filterMyBookings call — next week if weekend
 
 // ══ CHECK EXISTING SESSION ON LOAD ══
 (function() {
