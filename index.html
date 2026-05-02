@@ -659,9 +659,16 @@ function onAlightingSelected() {
   const boardNum = window._selectedStop.num;
   document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;
   window._selectedAlight = alight;
-  // Use live stopAvailability from API — reflects actual segment occupancy
-  const stopAvail = svc.stopAvailability || {};
-  const avail = (stopAvail[boardNum] !== undefined) ? +stopAvail[boardNum] : Math.max(0, CAP - svc.booked);
+
+  // Calculate availability for exact segment range boardNum → alightNum-1
+  // Max occupancy across only the segments this student will occupy
+  const segments = svc.segments || {};
+  let maxOccupancy = 0;
+  for (let s = boardNum; s < alightNum; s++) {
+    maxOccupancy = Math.max(maxOccupancy, segments[s] || 0);
+  }
+  const avail = Math.max(0, CAP - maxOccupancy);
+
   document.getElementById('sumSeats').textContent = avail + ' seat' + (avail !== 1 ? 's' : '') + ' available for your journey';
   document.getElementById('sumSeatsRow').style.display = '';
   if (btn) { btn.style.opacity='1'; btn.style.pointerEvents=''; btn.textContent='Confirm booking'; }
@@ -1282,10 +1289,10 @@ async function loadMyBookings() {
     _myBookings = (data.bookings || []).map(b => ({
       ref:        b.ref,
       svcId:      b.serviceNumber,
-      stopNum:    b.stopNumber,
-      alightNum:  b.alightingStop,
-      stopName:   STOPS[b.stopNumber - 1]?.name || `Stop ${b.stopNumber}`,
-      alightName: STOPS[(b.alightingStop || 1) - 1]?.name || `Stop ${b.alightingStop}`,
+      stopNum:    +b.stopNumber || 0,
+      alightNum:  +b.alightingStop || 0,
+      stopName:   STOPS[(+b.stopNumber || 1) - 1]?.name || ('Stop ' + b.stopNumber),
+      alightName: +b.alightingStop ? (STOPS[(+b.alightingStop) - 1]?.name || ('Stop ' + b.alightingStop)) : '',
       depTime:    b.departureTime,
       travelDate: b.travelDate,
       date:       new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }),
