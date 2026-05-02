@@ -306,4 +306,4 @@ function scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops, changedB
   return emailWrapper(content);
 }
 
-module.exports = { sendEmail, otpTemplate, passwordResetTemplate, welcomeTemplate, bookingConfirmTemplate };
+module.exports = { sendEmail, otpTemplate, passwordResetTemplate, welcomeTemplate, bookingConfirmTemplate, scheduleChangeTemplate };
