@@ -190,17 +190,17 @@ function formatEmailTime(t) {
   return String(h12).padStart(2,'0') + ':' + m + ' ' + ampm;
 }
 
-function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travelDate) {
+function bookingConfirmTemplate(name, ref, serviceNum, boardingStopName, alightingStopName, depTime, travelDate, cancelUrl) {
   const depTimeFormatted = formatEmailTime(depTime);
   const dateFormatted = travelDate.split('-').reverse().join('/');
   const rows = [
-    ['Reference',   `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
-    ['Service',     `Service No.${serviceNum}`],
-    ['Boarding at', stopName],
-    ['Departure',   depTimeFormatted],
-    ['Date',        dateFormatted],
+    ['Reference',       `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
+    ['Service',         `Service No.${serviceNum}`],
+    ['Getting on at',  boardingStopName],
+    ['Getting off at', alightingStopName],
+    ['Departure',       depTimeFormatted],
+    ['Date',            dateFormatted],
   ];
-  const cancelUrl = `https://book.hughesshuttle.com.au?cancel=${ref}`;
   const tableRows = rows.map(([label, value], i) => `
     <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#F8F6F1'};">
       <td style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;padding:10px 16px;width:40%;">${label}</td>
@@ -231,7 +231,6 @@ function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travel
     </p>`;
   return emailWrapper(content);
 }
-
 // ── Password reset email ──
 function passwordResetTemplate(name, otp) {
   const content = `

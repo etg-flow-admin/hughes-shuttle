@@ -1,154 +1,168 @@
 // api/shared/tableStorage.js
-// Azure Table Storage — used exclusively for seat counters
-// Provides atomic optimistic-concurrency seat booking safe for 2000+ concurrent users
-//
-// Table: ShuttleSeats
-// PartitionKey: travelDate  (e.g. "2026-05-12")
-// RowKey:       serviceNumber as string (e.g. "3")
-// SeatsBooked:  number
-// Capacity:     number (always 22)
+// Segment-based seat booking using Azure Table Storage
+// RowKey format: "{serviceNumber}-{stopNumber}"
+// Each row tracks passengers ON BOARD departing that stop
+// Booking Stop A to Stop B touches segments A, A+1, ... B-1
 
-const { TableClient, odata } = require('@azure/data-tables');
-const { getSecret }          = require('./keyVault');
+const { TableClient, TableServiceClient } = require('@azure/data-tables');
+const { getSecret } = require('./keyVault');
 
-const TABLE_NAME = 'ShuttleSeats';
+const TABLE_NAME = process.env.SEGMENTS_TABLE_NAME || 'ShuttleSegments';
 const CAPACITY   = 22;
-const MAX_RETRIES = 5;
 
-let _client = null;
+let _connStr = null;
+async function getConnStr() {
+  if (_connStr) return _connStr;
+  _connStr = await getSecret('azure-storage-connection');
+  return _connStr;
+}
 
 async function getClient() {
-  if (_client) return _client;
-  const connStr = await getSecret('azure-storage-connection');
-  _client = TableClient.fromConnectionString(connStr, TABLE_NAME);
-  // Create table if it doesn't exist (safe to call repeatedly)
-  try { await _client.createTable(); } catch (e) { /* already exists */ }
-  return _client;
+  const conn = await getConnStr();
+  return TableClient.fromConnectionString(conn, TABLE_NAME);
 }
 
-// Get current seat entity — creates it at 0 if it doesn't exist yet
-async function getOrCreateSeatEntity(travelDate, serviceNumber) {
-  const client = await getClient();
-  const pk = String(travelDate);
-  const rk = String(serviceNumber);
+async function ensureTable() {
+  const conn = await getConnStr();
   try {
-    const entity = await client.getEntity(pk, rk);
-    return entity;
-  } catch (err) {
-    if (err.statusCode === 404) {
-      // First booking for this service on this date — create the row
+    const svc = TableServiceClient.fromConnectionString(conn);
+    await svc.createTable(TABLE_NAME);
+  } catch (e) {
+    if (!e.message?.includes('TableAlreadyExists')) throw e;
+  }
+}
+
+async function getServiceSegments(travelDate, serviceNumber) {
+  const client = await getClient();
+  const prefix = `${serviceNumber}-`;
+  const result = {};
+  const iter   = client.listEntities({ queryOptions: {
+    filter: `PartitionKey eq '${travelDate}' and RowKey ge '${prefix}' and RowKey lt '${prefix}~'`
+  }});
+  for await (const entity of iter) {
+    const stopNum = parseInt(entity.rowKey.split('-')[1]);
+    result[stopNum] = entity.onBoard || 0;
+  }
+  return result;
+}
+
+async function getAvailabilityForDate(travelDate) {
+  const client = await getClient();
+  const iter   = client.listEntities({ queryOptions: {
+    filter: `PartitionKey eq '${travelDate}'`
+  }});
+  const raw = {};
+  for await (const entity of iter) {
+    const [svcNum, stopNum] = entity.rowKey.split('-').map(Number);
+    if (!raw[svcNum]) raw[svcNum] = {};
+    raw[svcNum][stopNum] = entity.onBoard || 0;
+  }
+  const result = {};
+  for (const [svcNum, segments] of Object.entries(raw)) {
+    const values     = Object.values(segments);
+    const maxOnBoard = values.length ? Math.max(...values) : 0;
+    result[svcNum]   = {
+      segments,
+      maxOnBoard,
+      booked:    maxOnBoard,
+      seatsLeft: Math.max(0, CAPACITY - maxOnBoard),
+    };
+  }
+  return result;
+}
+
+async function getStopAvailability(travelDate, serviceNumber, activeStops) {
+  const segments = await getServiceSegments(travelDate, serviceNumber);
+  const result   = {};
+  const lastStop  = Math.max(...activeStops);
+  for (const stop of activeStops) {
+    let maxOccupancy = 0;
+    for (let s = stop; s < lastStop; s++) {
+      maxOccupancy = Math.max(maxOccupancy, segments[s] || 0);
+    }
+    result[stop] = Math.max(0, CAPACITY - maxOccupancy);
+  }
+  return result;
+}
+
+async function bookSeat(travelDate, serviceNumber, boardingStop, alightingStop) {
+  await ensureTable();
+  const client   = await getClient();
+  const pk       = travelDate;
+  const segStops = [];
+  for (let s = boardingStop; s < alightingStop; s++) segStops.push(s);
+
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const entities = {};
+    for (const stop of segStops) {
       try {
-        await client.createEntity({
-          partitionKey: pk,
-          rowKey:       rk,
-          SeatsBooked:  0,
-          Capacity:     CAPACITY,
-        });
-      } catch (createErr) {
-        // Another concurrent request may have created it — that's fine
+        entities[stop] = await client.getEntity(pk, `${serviceNumber}-${stop}`);
+      } catch (e) {
+        if (e.statusCode === 404) entities[stop] = null;
+        else throw e;
       }
-      return await client.getEntity(pk, rk);
     }
-    throw err;
-  }
-}
-
-// Atomically increment seat count — returns { success, seatsBooked, seatsLeft }
-// Uses ETag optimistic concurrency with retry loop
-async function bookSeat(travelDate, serviceNumber) {
-  const client = await getClient();
-  const pk = String(travelDate);
-  const rk = String(serviceNumber);
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const entity = await getOrCreateSeatEntity(travelDate, serviceNumber);
-    const current = entity.SeatsBooked || 0;
-
-    if (current >= CAPACITY) {
-      return { success: false, reason: 'full', seatsBooked: current, seatsLeft: 0 };
+    for (const stop of segStops) {
+      if ((entities[stop]?.onBoard || 0) >= CAPACITY) {
+        return { success: false, reason: 'full', fullAtStop: stop };
+      }
     }
-
     try {
-      await client.updateEntity(
-        { partitionKey: pk, rowKey: rk, SeatsBooked: current + 1, Capacity: CAPACITY },
-        'Replace',
-        { etag: entity.etag }
-      );
-      return { success: true, seatsBooked: current + 1, seatsLeft: CAPACITY - (current + 1) };
-    } catch (err) {
-      if (err.statusCode === 412) {
-        // ETag conflict — another booking landed first, retry
-        const delay = 50 * attempt;
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-      throw err;
-    }
-  }
-  return { success: false, reason: 'conflict', seatsBooked: -1, seatsLeft: -1 };
-}
-
-// Decrement seat count (for cancellations) — also uses ETag retry
-async function releaseSeat(travelDate, serviceNumber) {
-  const client = await getClient();
-  const pk = String(travelDate);
-  const rk = String(serviceNumber);
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    let entity;
-    try { entity = await client.getEntity(pk, rk); }
-    catch (e) { return { success: true }; } // Entity doesn't exist — nothing to release
-
-    const current = entity.SeatsBooked || 0;
-    const newVal  = Math.max(0, current - 1);
-
-    try {
-      await client.updateEntity(
-        { partitionKey: pk, rowKey: rk, SeatsBooked: newVal, Capacity: CAPACITY },
-        'Replace',
-        { etag: entity.etag }
-      );
-      return { success: true, seatsBooked: newVal, seatsLeft: CAPACITY - newVal };
-    } catch (err) {
-      if (err.statusCode === 412) {
-        await new Promise(r => setTimeout(r, 50 * attempt));
-        continue;
-      }
-      throw err;
+      const actions = segStops.map(stop => {
+        const rk     = `${serviceNumber}-${stop}`;
+        const onBoard = (entities[stop]?.onBoard || 0) + 1;
+        const entity  = { partitionKey: pk, rowKey: rk, onBoard };
+        return entities[stop]
+          ? ['update', entity, { etag: entities[stop].etag, mode: 'Replace' }]
+          : ['create', entity];
+      });
+      await client.submitTransaction(actions);
+      const seatsLeft = CAPACITY - Math.max(...segStops.map(s => (entities[s]?.onBoard || 0) + 1));
+      return { success: true, seatsLeft: Math.max(0, seatsLeft) };
+    } catch (e) {
+      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied')) continue;
+      throw e;
     }
   }
   return { success: false, reason: 'conflict' };
 }
 
-// Get seat availability for a date — returns map of { serviceNumber: { booked, left } }
-async function getAvailabilityForDate(travelDate) {
-  const client = await getClient();
-  const entities = client.listEntities({
-    queryOptions: { filter: odata`PartitionKey eq ${String(travelDate)}` }
-  });
-  const result = {};
-  for await (const entity of entities) {
-    const svcNum = entity.rowKey;
-    const booked = entity.SeatsBooked || 0;
-    result[svcNum] = { booked, left: CAPACITY - booked };
-  }
-  return result;
-}
+async function cancelSeat(travelDate, serviceNumber, boardingStop, alightingStop) {
+  const client   = await getClient();
+  const pk       = travelDate;
+  const segStops = [];
+  for (let s = boardingStop; s < alightingStop; s++) segStops.push(s);
 
-// Seed a new travel date with all 9 services at 0 booked
-// Call this when an admin sets up a new day
-async function seedDate(travelDate) {
-  const client = await getClient();
-  for (let svc = 1; svc <= 9; svc++) {
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const entities = {};
+    for (const stop of segStops) {
+      try {
+        entities[stop] = await client.getEntity(pk, `${serviceNumber}-${stop}`);
+      } catch (e) {
+        if (e.statusCode === 404) entities[stop] = null;
+        else throw e;
+      }
+    }
     try {
-      await client.createEntity({
-        partitionKey: String(travelDate),
-        rowKey:       String(svc),
-        SeatsBooked:  0,
-        Capacity:     CAPACITY,
-      });
-    } catch (e) { /* already exists */ }
+      const actions = segStops
+        .filter(stop => entities[stop] && (entities[stop].onBoard || 0) > 0)
+        .map(stop => {
+          const onBoard = Math.max(0, (entities[stop].onBoard || 0) - 1);
+          return ['update',
+            { partitionKey: pk, rowKey: `${serviceNumber}-${stop}`, onBoard },
+            { etag: entities[stop].etag, mode: 'Replace' }
+          ];
+        });
+      if (actions.length) await client.submitTransaction(actions);
+      return { success: true };
+    } catch (e) {
+      if (e.statusCode === 412 || e.message?.includes('UpdateConditionNotSatisfied')) continue;
+      throw e;
+    }
   }
+  return { success: false, reason: 'conflict' };
 }
 
-module.exports = { bookSeat, releaseSeat, getAvailabilityForDate, seedDate, CAPACITY };
+module.exports = { bookSeat, cancelSeat, getAvailabilityForDate, getStopAvailability, getServiceSegments, CAPACITY };

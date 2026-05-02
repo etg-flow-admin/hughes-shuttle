@@ -422,9 +422,11 @@
         <div class="booking-form" id="bookingForm" style="display:none;">
           <p class="form-title">Complete your booking</p>
           <div class="sum-row"><span class="sum-key">Service</span><span class="sum-val" id="sumService"></span></div>
-          <div class="sum-row"><span class="sum-key">Boarding at</span><span class="sum-val" id="sumStop"></span></div>
+          <div class="sum-row"><span class="sum-key">Getting on at</span><span class="sum-val" id="sumStop"></span></div>
+          <div class="sum-row"><span class="sum-key">Getting off at</span><span class="sum-val" id="sumAlight">—</span></div>
           <div class="sum-row"><span class="sum-key">Departure</span><span class="sum-val" id="sumTime"></span></div>
           <div class="sum-row"><span class="sum-key">Seats available</span><span class="sum-val" id="sumSeats" style="color:#3B6D11;"></span></div>
+          <select class="inp" id="alightingSelect" onchange="onAlightingSelected()" style="margin:0 0 0.75rem;font-size:13px;display:none;"></select>
           <div id="bookingError" style="display:none;background:#FCEBEB;border:0.5px solid #F09595;border-radius:7px;padding:11px 13px;font-size:13px;color:#A32D2D;margin-bottom:0.75rem;"></div>
           <button class="btn-gold" style="margin-top:0.25rem;" onclick="confirmBooking()">Confirm booking</button>
           <button class="btn-ghost" onclick="cancelBooking()">Cancel</button>
@@ -592,28 +594,60 @@ function renderServices() {
 function selectStop(event, rowEl, svcId, stopNum) {
   event.stopPropagation();
   const svc = SERVICES.find(s => s.id === svcId);
-  if (!svc || seatsLeft(svc) === 0) return;
-  const stop    = STOPS[stopNum - 1];
-  const stopIdx = stopNum - 1;
+  if (!svc) return;
 
-  // Highlight selected stop row and card
+  const stopAvail = (svc.stopAvailability || {})[stopNum] ?? (CAP - svc.booked);
+  if (stopAvail <= 0) return;
+
+  const stop = STOPS[stopNum - 1];
+
   document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   rowEl.classList.add('stop-selected');
   rowEl.closest('.service-card').classList.add('selected');
 
-  const left = seatsLeft(svc);
+  window._selectedSvc    = svc;
+  window._selectedStop   = stop;
+  window._selectedFStop  = String(stopNum);
+  window._selectedAlight = null;
+
+  // Build alighting stop options — stops AFTER boarding that are active on this service
+  const activeAfter = STOPS
+    .map((s, i) => ({ ...s, time: svc.times[i] }))
+    .filter(s => s.time && s.time !== '*N/S' && s.num > stopNum);
+
+  const alightSel = document.getElementById('alightingSelect');
+  alightSel.innerHTML = '<option value="">— Select getting off stop —</option>' +
+    activeAfter.map(s => `<option value="${s.num}">Stop ${s.num} – ${s.name} (${formatTime(s.time)})</option>`).join('');
+  alightSel.value = '';
+  alightSel.style.display = 'block';
+
   document.getElementById('sumService').textContent = 'Service No.' + svc.id;
   document.getElementById('sumStop').textContent    = 'Stop ' + stop.num + ' – ' + stop.name;
-  document.getElementById('sumTime').textContent    = formatTime(svc.times[stopIdx]);
-  document.getElementById('sumSeats').textContent   = left + ' of ' + CAP + ' remaining';
-  window._selectedSvc   = svc;
-  window._selectedStop  = stop;
-  window._selectedFStop = String(stopNum);
+  document.getElementById('sumTime').textContent    = formatTime(svc.times[stopNum - 1]);
+  document.getElementById('sumSeats').textContent   = stopAvail + ' of ' + CAP + ' available';
+  document.getElementById('sumAlight').textContent  = '—';
+
   const f = document.getElementById('bookingForm');
   f.style.display = 'block';
+  const btn = document.querySelector('#bookingForm .btn-gold');
+  if (btn) { btn.disabled = true; btn.textContent = 'Select getting off stop'; }
   f.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
+
+function onAlightingSelected() {
+  const alightNum = +document.getElementById('alightingSelect').value;
+  if (!alightNum) return;
+  const svc    = window._selectedSvc;
+  const alight = STOPS[alightNum - 1];
+  document.getElementById('sumAlight').textContent = 'Stop ' + alight.num + ' – ' + alight.name;
+  window._selectedAlight = alight;
+  const avail = (svc.stopAvailability || {})[window._selectedStop.num] ?? (CAP - svc.booked);
+  document.getElementById('sumSeats').textContent = avail + ' of ' + CAP + ' available';
+  const btn = document.querySelector('#bookingForm .btn-gold');
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
+}
+
 
 function selectSvc(el, svc, fStop) {
   // Legacy — redirect to first active stop
@@ -647,6 +681,9 @@ function cancelBooking() {
   document.getElementById('bookingForm').style.display = 'none';
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.stop-row-selectable').forEach(r => r.classList.remove('stop-selected'));
+  const alightSel = document.getElementById('alightingSelect');
+  if (alightSel) { alightSel.style.display = 'none'; alightSel.innerHTML = ''; }
+  window._selectedAlight = null;
   const btn = document.querySelector('#bookingForm .btn-gold');
   if (btn) { btn.disabled = false; btn.textContent = 'Confirm booking'; }
   const errEl = document.getElementById('bookingError');
@@ -1127,6 +1164,7 @@ async function loadServices() {
         local.booked = svc.booked != null ? +svc.booked : local.booked;
         if (svc.times && svc.times.length >= 6) local.times = svc.times;
         local.disabled = svc.disabled === true;
+        local.stopAvailability = svc.stopAvailability || {};
       }
     });
     renderServices();
@@ -1155,7 +1193,12 @@ async function confirmBooking() {
     const res  = await fetch(API_BASE + '/api/confirm-booking', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body:    JSON.stringify({ serviceNumber: svc.id, stopNumber: stop.num, travelDate: date })
+      body:    JSON.stringify({
+        serviceNumber: svc.id,
+        boardingStop:  stop.num,
+        alightingStop: window._selectedAlight.num,
+        travelDate:    date
+      })
     });
     const data = await res.json();
 
@@ -1173,7 +1216,7 @@ async function confirmBooking() {
     const stopName = stop.name;
     const depTime  = svc.times[stopIdx];
     const dateStr  = new Date(date + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' });
-    addMyBooking({ ref: data.ref, svcId: svc.id, stopNum: stop.num, stopName, depTime, travelDate: date, date: dateStr });
+    addMyBooking({ ref: data.ref, svcId: svc.id, stopNum: stop.num, alightNum: window._selectedAlight?.num, stopName, alightName: window._selectedAlight?.name || '', depTime, travelDate: date, date: dateStr, status: 'Confirmed', cancelled: false });
 
     cancelBooking();
     renderServices();
@@ -1204,15 +1247,17 @@ async function loadMyBookings() {
     if (!res.ok) return;
     const data = await res.json();
     _myBookings = (data.bookings || []).map(b => ({
-      ref:       b.ref,
-      svcId:     b.serviceNumber,
-      stopNum:   b.stopNumber,
-      stopName:  STOPS[b.stopNumber - 1]?.name || `Stop ${b.stopNumber}`,
-      depTime:   b.departureTime,
+      ref:        b.ref,
+      svcId:      b.serviceNumber,
+      stopNum:    b.stopNumber,
+      alightNum:  b.alightingStop,
+      stopName:   STOPS[b.stopNumber - 1]?.name || `Stop ${b.stopNumber}`,
+      alightName: STOPS[(b.alightingStop || 1) - 1]?.name || `Stop ${b.alightingStop}`,
+      depTime:    b.departureTime,
       travelDate: b.travelDate,
-      date:      new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }),
-      status:    b.status,
-      cancelled: b.status === 'Cancelled'
+      date:       new Date(b.travelDate + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }),
+      status:     b.status,
+      cancelled:  b.status === 'Cancelled'
     }));
     // Sort: upcoming first by date, then by departure time
     _myBookings.sort((a, b) => {
@@ -1316,7 +1361,7 @@ function bookingCardHTML(b) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:14px;font-weight:600;color:var(--h-navy);">Service No.${b.svcId}</div>
-          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Stop ${b.stopNum} · ${formatTime(b.depTime)} · 1 seat</div>
+          <div style="font-size:12px;color:var(--h-muted);margin-top:3px;">Getting on: Stop ${b.stopNum}${b.alightNum ? ' · Getting off: Stop ' + b.alightNum : ''} · ${formatTime(b.depTime)} · 1 seat</div>
         </div>
         <span class="seat-pill ${b.cancelled ? 'pill-full' : 'pill-ok'}">${b.cancelled ? 'Cancelled' : 'Confirmed'}</span>
       </div>

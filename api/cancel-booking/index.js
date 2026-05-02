@@ -1,9 +1,9 @@
 // POST /api/cancel-booking
-// { ref } — student cancels their own booking, returns seat to Table Storage
+// { ref } — student cancels their own booking, frees segments in Table Storage
 const { verifyToken, authError }      = require('../shared/auth');
-const { wrapHandler }    = require('../shared/logger');
+const { wrapHandler }                 = require('../shared/logger');
 const { getListItem, updateListItem } = require('../shared/msLists');
-const { releaseSeat }                 = require('../shared/tableStorage');
+const { cancelSeat }                  = require('../shared/tableStorage');
 
 module.exports = wrapHandler('cancel-booking', async function (context, req) {
   let payload;
@@ -22,12 +22,19 @@ module.exports = wrapHandler('cancel-booking', async function (context, req) {
     if (booking.Status === 'Cancelled') {
       context.res = { status: 400, body: { error: 'Booking is already cancelled.' } }; return;
     }
+
     await updateListItem('ShuttleBookings', booking.ID, {
       Status:      'Cancelled',
       CancelledAt: new Date().toISOString(),
     });
-    // Return seat to Azure Table Storage
-    await releaseSeat(booking.TravelDate, booking.ServiceNumber);
+
+    // Free segments in Table Storage
+    const boardingStop  = +booking.StopNumber;
+    const alightingStop = +booking.AlightingStop;
+    if (boardingStop && alightingStop && boardingStop < alightingStop) {
+      await cancelSeat(booking.TravelDate, +booking.ServiceNumber, boardingStop, alightingStop);
+    }
+
     context.log.info(`cancel-booking: ${payload.email} cancelled ${ref}`);
     context.res = { status: 200, body: { cancelled: true, ref } };
   } catch (err) {

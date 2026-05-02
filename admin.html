@@ -336,7 +336,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         <div class="modal-status" id="add-status"></div>
         <div class="modal-grid">
           <div class="modal-field full">
-            <label class="modal-label">Full name *</label>
+            <label class="modal-label">Full name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
             <input class="modal-input" id="add-name" type="text" placeholder="Jane Doe">
           </div>
           <div class="modal-field">
@@ -1066,8 +1066,8 @@ async function submitAddUser() {
   const mobile = document.getElementById('add-mobile').value.trim();
   const isAdmin= document.getElementById('add-is-admin').checked;
   const s      = document.getElementById('add-status');
-  if (!name || !email) {
-    showStatus('add-status', 'Name and email address are required.', 'error'); return;
+  if (!email) {
+    showStatus('add-status', 'Email address is required.', 'error'); return;
   }
   if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
     showStatus('add-status', 'Please enter a valid email address.', 'error'); return;
