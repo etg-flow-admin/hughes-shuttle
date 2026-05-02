@@ -264,17 +264,25 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
         <div class="stat-card"><div class="stat-label">Total users</div><div class="stat-value" id="ds-total">—</div></div>
         <div class="stat-card"><div class="stat-label">Active users</div><div class="stat-value green" id="ds-active">—</div></div>
-        <div class="stat-card"><div class="stat-label">Bookings (selected date)</div><div class="stat-value gold" id="ds-today">—</div></div>
-        <div class="stat-card"><div class="stat-label">Seats filled</div><div class="stat-value" id="ds-seats">—</div></div>
+        <div class="stat-card"><div class="stat-label">Today's bookings</div><div class="stat-value gold" id="ds-today">—</div></div>
+        <div class="stat-card"><div class="stat-label">Seats filled today</div><div class="stat-value" id="ds-seats">—</div></div>
         <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value red" id="ds-cancelled">—</div></div>
       </div>
 
-      <!-- Today's service snapshot -->
-      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Today's services</div>
-      <div class="table-wrap">
+      <!-- Service snapshot with date picker -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.05em;">Services</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="shiftDashDate(-1)" style="background:var(--navy);color:var(--gold);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;cursor:pointer;font-family:inherit;">&#8249;</button>
+          <input type="date" id="dash-svc-date" style="font-size:12px;padding:5px 8px;border-radius:6px;border:0.5px solid var(--border);background:var(--white);color:var(--navy);font-family:inherit;cursor:pointer;" onchange="loadDashServices()">
+          <button onclick="shiftDashDate(1)" style="background:var(--navy);color:var(--gold);border:none;border-radius:6px;width:28px;height:28px;font-size:14px;cursor:pointer;font-family:inherit;">&#8250;</button>
+        </div>
+      </div>
+      <div id="dash-weekend-msg" style="display:none;text-align:center;padding:1.5rem;font-size:13px;color:var(--muted);background:var(--white);border-radius:8px;border:0.5px solid var(--border);">No services on weekends.</div>
+      <div class="table-wrap" id="dash-svc-table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Service</th><th>First departure</th><th>Booked</th><th>Available</th><th>Status</th>
+            <th>Service</th><th>First departure</th><th style="min-width:220px;">Stops</th><th style="text-align:center;">Booked</th><th style="text-align:center;">Available</th><th>Status</th>
           </tr></thead>
           <tbody id="dash-services-body"></tbody>
         </table>
@@ -336,7 +344,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
         <div class="modal-status" id="add-status"></div>
         <div class="modal-grid">
           <div class="modal-field full">
-            <label class="modal-label">Full name *</label>
+            <label class="modal-label">Full name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
             <input class="modal-input" id="add-name" type="text" placeholder="Jane Doe">
           </div>
           <div class="modal-field">
@@ -412,7 +420,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
+            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Date</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
           </tr></thead>
           <tbody id="booking-tbody"></tbody>
         </table>
@@ -438,7 +446,32 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
           <tbody id="svc-tbody"></tbody>
         </table>
       </div>
+    
+
+    <!-- Stop descriptions -->
+    <div style="margin-top:2rem;padding:0 1.5rem 1.5rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div class="page-title" style="font-size:16px;">Stop descriptions</div>
+          <div class="page-sub">Edit the name and address shown for each boarding stop.</div>
+        </div>
+        <button class="btn btn-gold btn-sm" onclick="saveStops()">Save stops</button>
+      </div>
+      <div class="modal-status" id="stops-status"></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th style="width:60px;">Stop</th>
+            <th>Name</th>
+            <th>Address / Description</th>
+          </tr></thead>
+          <tbody id="stops-tbody">
+            <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
 
   </main>
 </div>
@@ -743,12 +776,13 @@ async function init() {
 
 async function loadDashboard() {
   setAdminAvatar();
+  const _dsdEl = document.getElementById('dash-svc-date'); if (_dsdEl) _dsdEl.value = today();
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  document.getElementById('booking-date-filter').value = today();
+  // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
   await loadBookings();
   updateBadges();
-  // loadDashServices called on date init
+  loadDashServices();
 }
 
 // ── Load users ──
@@ -779,7 +813,7 @@ async function loadServices() {
   const data = await res.json();
   (data.services || []).forEach(svc => {
     const local = SERVICES.find(s => s.id === svc.serviceNumber);
-    if (local) { local.booked = svc.booked; local.times = svc.times; local.disabled = svc.disabled === true; }
+    if (local) { local.booked = svc.booked; local.times = svc.times; local.disabled = svc.disabled === true; local.dropoffOnlyStops = svc.dropoffOnlyStops || []; }
   });
 }
 
@@ -859,7 +893,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
 }
 
 // ── Dashboard services ──
@@ -873,12 +907,10 @@ function shiftDashDate(days) {
 }
 
 async function loadDashServices() {
-  const dateEl = document.getElementById('dash-svc-date');
-  const date   = dateEl?.value || today();
-  const wkndMsg  = document.getElementById('dash-weekend-msg');
+  const dateEl    = document.getElementById('dash-svc-date');
+  const date      = dateEl?.value || today();
+  const wkndMsg   = document.getElementById('dash-weekend-msg');
   const tableWrap = document.getElementById('dash-svc-table-wrap');
-
-  // Show weekend message
   const d = new Date(date + 'T12:00');
   if (d.getDay() === 0 || d.getDay() === 6) {
     if (wkndMsg) wkndMsg.style.display = '';
@@ -887,52 +919,45 @@ async function loadDashServices() {
   }
   if (wkndMsg) wkndMsg.style.display = 'none';
   if (tableWrap) tableWrap.style.display = '';
-
   const tbody = document.getElementById('dash-services-body');
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--muted);">Loading…</td></tr>';
-
   try {
     const data = await apiFetch('/api/get-services?date=' + date);
     if (!data || !data.services) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1rem;">No data.</td></tr>'; return; }
     const svcs = data.services;
     tbody.innerHTML = svcs.map(s => {
-      const stopAvail  = s.stopAvailability || {};
-      const segments   = s.segments || {};
+      const segments  = s.segments || {};
+      const stopAvail = s.stopAvailability || {};
+      const dropoff   = s.dropoffOnlyStops || [];
       const activeStops = s.times.map((t,i) => t !== '*N/S' ? i+1 : null).filter(Boolean);
-      const dropoff    = s.dropoffOnlyStops || [];
-      const firstTime  = s.times.find(t => t !== '*N/S') || '—';
-      // Max onBoard across all segments
-      const maxBooked  = activeStops.length > 1
+      const firstTime = s.times.find(t => t !== '*N/S') || '—';
+      const maxBooked = activeStops.length > 1
         ? Math.max(...Object.values(segments).map(v => +v || 0), 0)
         : (s.booked || 0);
       const left = Math.max(0, CAP - maxBooked);
       const full = left === 0, low = left <= 3 && !full;
-
-      // Stop rows
       const stopRows = activeStops.map(num => {
-        const t        = s.times[num-1];
-        const isDO     = dropoff.includes(num);
-        const segAvail = stopAvail[num] !== undefined ? +stopAvail[num] : left;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;border-bottom:0.5px solid var(--border);gap:8px;">
+        const t      = s.times[num-1];
+        const isDO   = dropoff.includes(num);
+        const avail  = stopAvail[num] !== undefined ? +stopAvail[num] : left;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;border-bottom:0.5px solid var(--border);gap:6px;">
           <span style="color:var(--muted);flex-shrink:0;">Stop ${num}</span>
-          <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${STOPS[num-1]?.name || ''}</span>
-          ${isDO ? '<span style="color:var(--muted);font-style:italic;flex-shrink:0;">Drop-off</span>' : `<span style="flex-shrink:0;">${formatSvcTime(t)}</span>`}
-          ${isDO ? '' : `<span style="flex-shrink:0;font-weight:600;color:${segAvail <= 3 ? '#A32D2D' : '#3B6D11'};">${segAvail} left</span>`}
+          <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${STOPS[num-1]?.name||''}</span>
+          ${isDO ? '<span style="color:var(--muted);font-style:italic;flex-shrink:0;">Drop-off</span>'
+                 : `<span style="flex-shrink:0;">${formatSvcTime(t)}</span>
+                    <span style="flex-shrink:0;font-weight:600;color:${avail<=3?'#A32D2D':'#3B6D11'};">${avail} left</span>`}
         </div>`;
       }).join('');
-
       return `<tr>
         <td><strong>Service No.${s.id}</strong></td>
         <td>${formatSvcTime(firstTime)}</td>
-        <td style="min-width:220px;"><div style="padding:2px 0;">${stopRows}</div></td>
+        <td style="min-width:220px;">${stopRows}</td>
         <td style="text-align:center;font-weight:700;">${maxBooked}</td>
         <td style="text-align:center;font-weight:700;color:${full?'#A32D2D':low?'#B85C00':'#3B6D11'};">${left}</td>
         <td><span class="badge ${full?'badge-cancelled':low?'badge-pending':'badge-confirmed'}">${full?'Full':low?'Low':'Available'}</span></td>
       </tr>`;
     }).join('');
-
-    // Update seats stat
-    const totalBooked = svcs.reduce((a,s) => a + Math.max(...Object.values(s.segments||{}).map(v=>+v||0), 0), 0);
+    const totalBooked = svcs.reduce((a,s) => a + Math.max(...Object.values(s.segments||{0:0}).map(v=>+v||0)), 0);
     const el = document.getElementById('ds-seats');
     if (el) el.textContent = totalBooked + ' / ' + (CAP * svcs.length);
   } catch(e) {
@@ -1126,7 +1151,7 @@ async function submitAddUser() {
   const mobile = document.getElementById('add-mobile').value.trim();
   const isAdmin= document.getElementById('add-is-admin').checked;
   const s      = document.getElementById('add-status');
-  if (!name || !email) {
+  if (!email) {
     showStatus('add-status', 'Name and email address are required.', 'error'); return;
   }
   if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
@@ -1152,6 +1177,7 @@ async function submitAddUser() {
 
 // ── Bookings ──
 async function reloadBookings() {
+  window._bkPage = 1;
   const dateF = document.getElementById('booking-date-filter').value;
   const svcF  = document.getElementById('booking-svc-filter').value;
   const stF   = document.getElementById('booking-status-filter').value;
@@ -1169,6 +1195,11 @@ function renderBookings() {
     (stF  === 'all' || b.status === stF)
   );
   document.getElementById('booking-count').textContent = bks.length + ' booking' + (bks.length !== 1 ? 's' : '');
+  if (!window._bkPage) window._bkPage = 1;
+  const BK_PAGE_SIZE = 20;
+  const bkTotalPages = Math.ceil(bks.length / BK_PAGE_SIZE);
+  if (window._bkPage > bkTotalPages) window._bkPage = 1;
+  bks = bks.slice((window._bkPage - 1) * BK_PAGE_SIZE, window._bkPage * BK_PAGE_SIZE);
   const tbody = document.getElementById('booking-tbody');
   if (!bks.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No bookings found.</td></tr>'; return; }
   tbody.innerHTML = bks.map(b => `<tr>
@@ -1176,12 +1207,24 @@ function renderBookings() {
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
     <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
+    <td class="muted">${b.date ? new Date(b.date + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }) : ''}</td>
     <td>${formatSvcTime(b.time)}</td>
     <td>1</td>
     <td><span class="badge ${bkBadge(b.status)}">${b.status}</span></td>
     <td class="muted">${b.bookedAt}</td>
     <td>${b.status !== 'Cancelled' ? `<button class="btn btn-outline btn-sm" onclick="openBookingDetail('${b.ref}')">View</button>` : ''}</td>
   </tr>`).join('');
+  const bkExPag = document.getElementById('bk-pagination');
+  if (bkExPag) bkExPag.remove();
+  if (bkTotalPages > 1) {
+    const pag = document.createElement('div');
+    pag.id = 'bk-pagination';
+    pag.style.cssText = 'display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:0.75rem;font-size:13px;';
+    pag.innerHTML = `<span style="color:var(--muted);">Page ${window._bkPage} of ${bkTotalPages}</span>` +
+      (window._bkPage > 1 ? `<button class="btn btn-outline btn-sm" onclick="window._bkPage--;renderBookings()">&#8249; Prev</button>` : '') +
+      (window._bkPage < bkTotalPages ? `<button class="btn btn-outline btn-sm" onclick="window._bkPage++;renderBookings()">Next &#8250;</button>` : '');
+    document.getElementById('booking-tbody').closest('.table-wrap').after(pag);
+  }
 }
 
 async function reloadHistory() {
@@ -1321,12 +1364,14 @@ function openEditSchedule(svcId) {
   document.getElementById('sched-modal-title').textContent = 'Edit schedule — Service No.' + svcId;
   const st = document.getElementById('sched-status');
   st.className = 'modal-status'; st.textContent = '';
+  const dropoffOnly = svc.dropoffOnlyStops || [];
   const grid = document.getElementById('sched-stops-grid');
   grid.innerHTML = STOPS.map((stop, i) => {
     const t = svc.times[i];
     const isNS = t === '*N/S';
+    const isDO = dropoffOnly.includes(stop.num);
     const timeVal = isNS ? '' : t.replace(/^(\d):/, '0$1:');
-    return `<div class="sched-stop-row" id="sched-row-${i}">
+    return `<div class="sched-stop-row" id="sched-row-${i}" style="${isNS ? 'opacity:0.45;' : ''}">
       <div class="sched-stop-num">${stop.num}</div>
       <div class="sched-stop-info">
         <div class="sched-stop-name">${stop.name}</div>
@@ -1337,16 +1382,22 @@ function openEditSchedule(svcId) {
         <input type="checkbox" id="sched-ns-${i}" ${isNS?'checked':''} onchange="toggleNS(${i})">
         Not serviced
       </label>
+      <label class="sched-ns-label" style="margin-left:8px;">
+        <input type="checkbox" id="sched-do-${i}" ${isDO?'checked':''} ${isNS?'disabled':''}>
+        Drop-off only
+      </label>
     </div>`;
   }).join('');
   openModal('modal-schedule');
 }
 
 function toggleNS(idx) {
-  const isNS  = document.getElementById('sched-ns-' + idx).checked;
+  const isNS = document.getElementById('sched-ns-' + idx).checked;
   const input = document.getElementById('sched-time-' + idx);
+  const doEl  = document.getElementById('sched-do-' + idx);
   input.disabled = isNS;
-  if (isNS) input.value = '';
+  if (isNS) { input.value = ''; if (doEl) { doEl.checked = false; doEl.disabled = true; } }
+  else { if (doEl) doEl.disabled = false; }
   document.getElementById('sched-row-' + idx).style.opacity = isNS ? '0.45' : '1';
 }
 
@@ -1374,9 +1425,15 @@ async function saveSchedule() {
 
   const btn = document.querySelector('#modal-schedule .btn-gold');
   btn.disabled = true; btn.textContent = 'Saving…';
+  const dropoffOnlyStops = [];
+  STOPS.forEach((_, i) => {
+    const doEl = document.getElementById('sched-do-' + i);
+    const nsEl = document.getElementById('sched-ns-' + i);
+    if (doEl && doEl.checked && !(nsEl && nsEl.checked)) dropoffOnlyStops.push(i + 1);
+  });
   const res = await authFetch('/api/mgmt-update-schedule', {
     method: 'POST',
-    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes })
+    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes, dropoffOnlyStops })
   });
   btn.disabled = false; btn.textContent = 'Save schedule';
   if (!res || !res.ok) { showStatus('sched-status', 'Failed to save schedule.', 'error'); return; }
@@ -1425,6 +1482,44 @@ document.addEventListener('click', function(e) {
 });
 
 // Set admin initials from session
+// ── Stop descriptions ──
+let _stops = [];
+const STOP_DEFAULTS = [
+  { num:1, name:'Adelaide University Village', addr:'210 Grote St' },
+  { num:2, name:'City Campus West',            addr:'Medical School' },
+  { num:3, name:'Bus Interchange Centre',      addr:'Stop W2 King William St - West side' },
+  { num:4, name:'Bus Interchange Centre',      addr:'Stop C3 King William St - East side' },
+  { num:5, name:'City Campus East',            addr:'Business School' },
+  { num:6, name:'Central Market & Chinatown',  addr:'Stop W2 Grote St - South side' },
+  { num:7, name:'Adelaide University Village', addr:'Return - 210 Grote St' },
+];
+async function loadStops() {
+  try {
+    const res = await authFetch('/api/get-stops');
+    _stops = (res && res.ok) ? (await res.json()).stops || STOP_DEFAULTS : [...STOP_DEFAULTS];
+  } catch(e) { _stops = [...STOP_DEFAULTS]; }
+  renderStopsTable();
+}
+function renderStopsTable() {
+  const tbody = document.getElementById('stops-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = _stops.map(s => `<tr>
+    <td><div style="width:28px;height:28px;border-radius:50%;background:var(--gold-pale);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);">${s.num}</div></td>
+    <td><input class="modal-input" id="stop-name-${s.num}" value="${esc(s.name)}" style="width:100%;"></td>
+    <td><input class="modal-input" id="stop-addr-${s.num}" value="${esc(s.addr)}" style="width:100%;"></td>
+  </tr>`).join('');
+}
+async function saveStops() {
+  const updated = _stops.map(s => ({
+    num:  s.num,
+    name: document.getElementById('stop-name-' + s.num)?.value.trim() || s.name,
+    addr: document.getElementById('stop-addr-' + s.num)?.value.trim() || s.addr,
+  }));
+  const res = await authFetch('/api/mgmt-update-stops', { method:'POST', body: JSON.stringify({ stops: updated }) });
+  showStatus('stops-status', res && res.ok ? 'Stop descriptions saved.' : 'Failed to save.', res && res.ok ? 'success' : 'error');
+  if (res && res.ok) _stops = updated;
+}
+
 function setAdminAvatar() {
   const name = localStorage.getItem('hs_name') || 'Admin';
   const initials = name.split(' ').map(p => p[0] && p[0].toUpperCase()).filter(Boolean).slice(0,2).join('') || 'AD';
