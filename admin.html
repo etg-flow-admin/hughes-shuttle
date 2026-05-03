@@ -328,7 +328,6 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
             <th onclick="sortUsers('lastLoginAt')">Last login <span class="sort-arrow">↕</span></th>
-            <th onclick="sortUsers('createdAt')">Created <span class="sort-arrow">↕</span></th>
             <th></th>
           </tr></thead>
           <tbody id="user-tbody"></tbody>
@@ -804,7 +803,6 @@ async function loadUsers() {
     emailVerified:u.emailVerified,
     createdAt:    u.createdAt,
     lastLoginAt:  u.lastLoginAt,
-    createdAt:    u.createdAt,
     bookings:     0,  // will be computed from bookings
   }));
 }
@@ -843,7 +841,7 @@ async function loadBookings(date, svcFilter, statusFilter) {
     roomNumber: b.roomNumber || '',
     svc:       b.serviceNumber,
     stopNum:   b.stopNumber,
-    alightNum: b.alightingStop || null,
+    alightNum: +b.alightingStop || null,
     time:      b.departureTime,
     seats:     1,
     status:    b.status,
@@ -1000,7 +998,7 @@ function renderUsers() {
   });
   document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
   const tbody = document.getElementById('user-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
   tbody.innerHTML = users.map(u => `<tr>
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
@@ -1010,7 +1008,6 @@ function renderUsers() {
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
     <td class="muted">${u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : '—'}</td>
-    <td class="muted">${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '—'}</td>
     <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button></td>
   </tr>`).join('');
 }
@@ -1603,18 +1600,20 @@ function exportBookingsCSV() {
     if (toDate   && b.date > toDate)   return false;
     return true;
   });
-  const headers = ['Reference','Name','Student ID','Room','Email','Service','Stop','Stop Name','Departure','Date','Seats','Status','Booked At'];
+  const headers = ['Reference','Name','Student ID','Room','Email','Service','Getting On Stop','Getting On Name','Getting Off Stop','Getting Off Name','Departure','Date','Seats','Status','Booked At'];
   const rows = bks.map(b => [
     b.ref, b.name, b.sid||'', b.roomNumber||'', b.userEmail||'',
-    'Service No.'+b.svc, 'Stop '+b.stopNum, STOPS[b.stopNum-1]?.name||'',
+    'Service No.'+b.svc,
+    'Stop '+b.stopNum, STOPS[b.stopNum-1]?.name||'',
+    b.alightNum ? 'Stop '+b.alightNum : '', b.alightNum ? (STOPS[b.alightNum-1]?.name||'') : '',
     b.time||'', b.date||'', 1, b.status, b.bookedAt||''
   ]);
   exportCSV('bookings-' + label + '-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
 function exportHistoryCSV() {
-  const headers = ['Reference','Name','Student ID','Room','Service','Date','Stop','Departure','Status','Booked At'];
-  const rows = _bookings.map(b => [b.ref, b.name, b.sid||'', b.roomNumber||'', 'Service No.'+b.svc, b.date, 'Stop '+b.stopNum, b.time||'', b.status, b.bookedAt||'']);
+  const headers = ['Reference','Name','Student ID','Room','Service','Date','Getting On Stop','Getting On Name','Getting Off Stop','Getting Off Name','Departure','Status','Booked At'];
+  const rows = _bookings.map(b => [b.ref, b.name, b.sid||'', b.roomNumber||'', 'Service No.'+b.svc, b.date, 'Stop '+b.stopNum, STOPS[b.stopNum-1]?.name||'', b.alightNum ? 'Stop '+b.alightNum : '', b.alightNum ? (STOPS[b.alightNum-1]?.name||'') : '', b.time||'', b.status, b.bookedAt||'']);
   exportCSV('booking-history-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
