@@ -190,17 +190,17 @@ function formatEmailTime(t) {
   return String(h12).padStart(2,'0') + ':' + m + ' ' + ampm;
 }
 
-function bookingConfirmTemplate(name, ref, serviceNum, boardingStopName, alightingStopName, depTime, travelDate, cancelUrl) {
+function bookingConfirmTemplate(name, ref, serviceNum, stopName, depTime, travelDate) {
   const depTimeFormatted = formatEmailTime(depTime);
   const dateFormatted = travelDate.split('-').reverse().join('/');
   const rows = [
-    ['Reference',       `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
-    ['Service',         `Service No.${serviceNum}`],
-    ['Getting on at',  boardingStopName],
-    ['Getting off at', alightingStopName],
-    ['Departure',       depTimeFormatted],
-    ['Date',            dateFormatted],
+    ['Reference',   `<strong style="font-family:'Courier New',monospace;">${ref}</strong>`],
+    ['Service',     `Service No.${serviceNum}`],
+    ['Boarding at', stopName],
+    ['Departure',   depTimeFormatted],
+    ['Date',        dateFormatted],
   ];
+  const cancelUrl = `https://book.hughesshuttle.com.au?cancel=${ref}`;
   const tableRows = rows.map(([label, value], i) => `
     <tr style="background-color:${i % 2 === 0 ? '#ffffff' : '#F8F6F1'};">
       <td style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;padding:10px 16px;width:40%;">${label}</td>
@@ -231,6 +231,7 @@ function bookingConfirmTemplate(name, ref, serviceNum, boardingStopName, alighti
     </p>`;
   return emailWrapper(content);
 }
+
 // ── Password reset email ──
 function passwordResetTemplate(name, otp) {
   const content = `
@@ -265,39 +266,71 @@ function passwordResetTemplate(name, otp) {
   return emailWrapper(content);
 }
 
-function scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops, changedBy) {
+
+function scheduleChangeTemplate(serviceTitle, serviceNumber, oldFields, newTimes, newDropoffOnly, wasDisabled, isNowDisabled, changedBy) {
   const STOP_NAMES = [
-    'Adelaide University Village', 'City Campus West', 'Bus Interchange Centre',
-    'Bus Interchange Centre', 'City Campus East', 'Central Market & Chinatown',
+    'Adelaide University Village', 'City Campus West', 'Bus Interchange Centre (West)',
+    'Bus Interchange Centre (East)', 'City Campus East', 'Central Market & Chinatown',
     'Adelaide University Village (Return)'
   ];
-  const stopRows = times.map((t, i) => {
-    const isNS = t === '*N/S' || !t;
-    const isDO = (dropoffOnlyStops || []).includes(i + 1);
-    const label = isNS ? '<span style="color:#9CA3AF;">Not serviced</span>'
-                       : isDO ? `${formatEmailTime(t)} <span style="color:#9CA3AF;font-size:11px;">(Drop-off only)</span>`
-                              : formatEmailTime(t);
-    return `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:${i%2===0?'#ffffff':'#F8F6F1'};font-size:13px;">
-      <span style="color:#6B7280;min-width:60px;">Stop ${i+1}</span>
-      <span style="flex:1;color:#1A2340;">${STOP_NAMES[i] || ''}</span>
-      <span style="color:#1A2340;font-weight:600;min-width:80px;text-align:right;">${label}</span>
-    </div>`;
+
+  const oldTimes = [
+    oldFields?.Stop1Time, oldFields?.Stop2Time, oldFields?.Stop3Time, oldFields?.Stop4Time,
+    oldFields?.Stop5Time, oldFields?.Stop6Time, oldFields?.Stop7Time
+  ];
+  const oldDropoff = (oldFields?.DropoffOnlyStops || '').split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+
+  // Build change rows — only show rows where something changed
+  const allRows = STOP_NAMES.map((name, i) => {
+    const stopNum  = i + 1;
+    const oldT     = oldTimes[i] || '*N/S';
+    const newT     = newTimes[i] || '*N/S';
+    const oldDO    = oldDropoff.includes(stopNum);
+    const newDO    = (newDropoffOnly || []).includes(stopNum);
+
+    const oldLabel = oldT === '*N/S' ? 'Not serviced' : (oldDO ? formatEmailTime(oldT) + ' (Drop-off)' : formatEmailTime(oldT));
+    const newLabel = newT === '*N/S' ? 'Not serviced' : (newDO ? formatEmailTime(newT) + ' (Drop-off)' : formatEmailTime(newT));
+    const changed  = oldLabel !== newLabel;
+
+    return { stopNum, name, oldLabel, newLabel, changed };
+  });
+
+  // Service enabled/disabled change
+  const statusChanged = wasDisabled !== isNowDisabled;
+  const statusRow = statusChanged ? `
+    <tr style="background:#FFF7ED;">
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:10px 14px;font-weight:700;color:#1A2340;border-bottom:1px solid #E5E7EB;">Service status</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:10px 14px;color:#A32D2D;text-decoration:line-through;border-bottom:1px solid #E5E7EB;">${wasDisabled ? 'Disabled' : 'Active'}</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:10px 14px;color:#3B6D11;font-weight:700;border-bottom:1px solid #E5E7EB;">${isNowDisabled ? 'Disabled' : 'Active'}</td>
+    </tr>` : '';
+
+  const stopRows = allRows.map((r, i) => {
+    const bg      = r.changed ? '#FFFBEB' : (i % 2 === 0 ? '#ffffff' : '#F8F6F1');
+    const oldStyle = r.changed ? 'color:#A32D2D;text-decoration:line-through;' : 'color:#6B7280;';
+    const newStyle = r.changed ? 'color:#3B6D11;font-weight:700;' : 'color:#1A2340;';
+    return `<tr style="background:${bg};">
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:9px 14px;color:#1A2340;border-bottom:1px solid #E5E7EB;">Stop ${r.stopNum} – ${r.name}</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:9px 14px;${oldStyle}border-bottom:1px solid #E5E7EB;">${r.oldLabel}</td>
+      <td style="font-family:Arial,sans-serif;font-size:13px;padding:9px 14px;${newStyle}border-bottom:1px solid #E5E7EB;">${r.newLabel}</td>
+    </tr>`;
   }).join('');
 
+  const hasChanges = allRows.some(r => r.changed) || statusChanged;
+  const changeBadge = hasChanges
+    ? `<p style="font-family:Arial,sans-serif;font-size:12px;color:#B85C00;text-align:center;margin:0 0 16px;"><strong>${allRows.filter(r=>r.changed).length + (statusChanged?1:0)} change${allRows.filter(r=>r.changed).length + (statusChanged?1:0)!==1?'s':''} made</strong></p>`
+    : '';
+
   const content = `
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
-      <tr><td align="center">
-        <p style="font-family:Arial,sans-serif;font-size:18px;font-weight:700;color:#1A2340;margin:0 0 4px;">Schedule Updated</p>
-        <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;margin:0;">Service No.${serviceNumber} has been updated</p>
-      </td></tr>
-    </table>
-    <table width="100%" cellpadding="0" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#E5E7EB;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+    <p style="font-family:Arial,sans-serif;font-size:20px;font-weight:700;color:#1A2340;text-align:center;margin:0 0 4px;">Schedule Updated</p>
+    <p style="font-family:Arial,sans-serif;font-size:13px;color:#6B7280;text-align:center;margin:0 0 20px;">${serviceTitle || ('Service No.' + serviceNumber)}</p>
+    ${changeBadge}
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;margin-bottom:16px;">
       <tr style="background:#1A2340;">
-        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;">Stop</td>
-        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;">Location</td>
-        <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:0.06em;text-align:right;">Time</td>
+        <th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;padding:10px 14px;text-align:left;text-transform:uppercase;letter-spacing:0.06em;">Stop</th>
+        <th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;padding:10px 14px;text-align:left;text-transform:uppercase;letter-spacing:0.06em;">Before</th>
+        <th style="font-family:Arial,sans-serif;font-size:11px;font-weight:700;color:#C9A84C;padding:10px 14px;text-align:left;text-transform:uppercase;letter-spacing:0.06em;">After</th>
       </tr>
+      ${statusRow}
       ${stopRows}
     </table>
     <p style="font-family:Arial,sans-serif;font-size:12px;color:#9CA3AF;text-align:center;margin:0;">

@@ -328,6 +328,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
             <th onclick="sortUsers('lastLoginAt')">Last login <span class="sort-arrow">↕</span></th>
+            <th onclick="sortUsers('createdAt')">Created <span class="sort-arrow">↕</span></th>
             <th></th>
           </tr></thead>
           <tbody id="user-tbody"></tbody>
@@ -420,7 +421,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Ref</th><th>Student</th><th>Service</th><th>Stop</th><th>Date</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
+            <th>Ref</th><th>Student</th><th>Service</th><th>Getting on</th><th>Getting off</th><th>Date</th><th>Time</th><th>Seats</th><th>Status</th><th>Booked at</th><th></th>
           </tr></thead>
           <tbody id="booking-tbody"></tbody>
         </table>
@@ -568,15 +569,9 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
     <div class="modal-status" id="sched-status"></div>
     <div id="sched-stops-grid"></div>
     <hr class="modal-divider">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-        <input type="checkbox" id="sched-disabled" style="width:15px;height:15px;accent-color:#A32D2D;cursor:pointer;">
-        <span style="color:#A32D2D;font-weight:600;">Disable this service</span>
-      </label>
-      <div style="display:flex;gap:10px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btn-gold" onclick="saveSchedule()">Save schedule</button>
       <button class="btn btn-outline" onclick="closeModal('modal-schedule')">Cancel</button>
-      </div>
     </div>
   </div>
 </div>
@@ -787,8 +782,6 @@ async function loadDashboard() {
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
-  renderServicesPanel();
-  renderScheduleOverview();
   await loadBookings();
   updateBadges();
   loadDashServices();
@@ -811,6 +804,7 @@ async function loadUsers() {
     emailVerified:u.emailVerified,
     createdAt:    u.createdAt,
     lastLoginAt:  u.lastLoginAt,
+    createdAt:    u.createdAt,
     bookings:     0,  // will be computed from bookings
   }));
 }
@@ -849,6 +843,7 @@ async function loadBookings(date, svcFilter, statusFilter) {
     roomNumber: b.roomNumber || '',
     svc:       b.serviceNumber,
     stopNum:   b.stopNumber,
+    alightNum: b.alightingStop || null,
     time:      b.departureTime,
     seats:     1,
     status:    b.status,
@@ -908,7 +903,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadStops(); loadServices().then(() => { renderServicesPanel(); renderScheduleOverview(); }); }
+  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
 }
 
 // ── Dashboard services ──
@@ -1005,7 +1000,7 @@ function renderUsers() {
   });
   document.getElementById('user-count').textContent = users.length + ' of ' + _users.length + ' users';
   const tbody = document.getElementById('user-tbody');
-  if (!users.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
+  if (!users.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem;">No users found.</td></tr>'; return; }
   tbody.innerHTML = users.map(u => `<tr>
     <td><strong>${esc(u.name)}</strong></td>
     <td class="muted">${esc(u.email)}</td>
@@ -1015,6 +1010,7 @@ function renderUsers() {
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
     <td class="muted">${u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : '—'}</td>
+    <td class="muted">${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '—'}</td>
     <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button></td>
   </tr>`).join('');
 }
@@ -1223,7 +1219,8 @@ function renderBookings() {
     <td><span class="ref-code">${b.ref}</span></td>
     <td><strong>${esc(b.name)}</strong><div class="booking-detail">${esc(b.sid||'')}${b.roomNumber ? ' · ' + esc(b.roomNumber) : ''}</div></td>
     <td>Service No.${b.svc}</td>
-    <td>Stop ${b.stopNum} – ${STOPS[b.stopNum-1]?.name||''}</td>
+    <td>Stop ${b.stopNum}${STOPS[b.stopNum-1] ? ' – ' + STOPS[b.stopNum-1].name : ''}</td>
+    <td>${b.alightNum ? 'Stop ' + b.alightNum + (STOPS[b.alightNum-1] ? ' – ' + STOPS[b.alightNum-1].name : '') : '<span style="color:var(--muted);">—</span>'}</td>
     <td class="muted">${b.date ? new Date(b.date + 'T12:00').toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short' }) : ''}</td>
     <td>${formatSvcTime(b.time)}</td>
     <td>1</td>
@@ -1407,7 +1404,7 @@ function openEditSchedule(svcId) {
   const svc = SERVICES.find(s => s.id === svcId);
   if (!svc) return;
   _editSchedSvcId = svcId;
-  document.getElementById('sched-modal-title').textContent = 'Edit schedule — ' + (svc.title || ('Service No.' + svcId));
+  document.getElementById('sched-modal-title').textContent = 'Edit schedule — Service No.' + svcId;
   const st = document.getElementById('sched-status');
   st.className = 'modal-status'; st.textContent = '';
   const dropoffOnly = svc.dropoffOnlyStops || [];
@@ -1434,8 +1431,6 @@ function openEditSchedule(svcId) {
       </label>
     </div>`;
   }).join('');
-  const _disEl = document.getElementById('sched-disabled');
-  if (_disEl) _disEl.checked = svc.disabled === true;
   openModal('modal-schedule');
 }
 
@@ -1469,7 +1464,7 @@ async function saveSchedule() {
     }
   });
   if (hasError) { showStatus('sched-status', 'Please enter a time for all active stops.', 'error'); return; }
-  // No minimum stop requirement
+  if (!hasStop) { showStatus('sched-status', 'At least one stop must be active.', 'error'); return; }
 
   const btn = document.querySelector('#modal-schedule .btn-gold');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -1481,7 +1476,7 @@ async function saveSchedule() {
   });
   const res = await authFetch('/api/mgmt-update-schedule', {
     method: 'POST',
-    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes, dropoffOnlyStops, disabled: document.getElementById('sched-disabled')?.checked === true })
+    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes, dropoffOnlyStops })
   });
   btn.disabled = false; btn.textContent = 'Save schedule';
   if (!res || !res.ok) { showStatus('sched-status', 'Failed to save schedule.', 'error'); return; }

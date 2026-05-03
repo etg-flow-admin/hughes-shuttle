@@ -9,7 +9,7 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
   let payload;
   try { payload = await verifyToken(req); } catch (err) { authError(context, err); return; }
 
-  // Verify admin by looking up user record — don't rely on token payload.isAdmin
+  // Verify admin by looking up user record
   const userRecord = await getListItem('ShuttleUsers', `Title eq '${payload.email}'`).catch(() => null);
   if (!userRecord || (!userRecord.IsAdmin && userRecord.IsAdmin !== 1)) {
     context.res = { status: 403, body: { error: 'Admin access required.' } }; return;
@@ -21,7 +21,12 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
   }
 
   try {
+    // Capture BEFORE state for audit email
     const existing = await getListItem('ShuttleServices', `ServiceNumber eq ${serviceNumber}`);
+    const oldFields = existing || {};
+    const wasDisabled = existing?.IsDisabled === true;
+    const serviceTitle = existing?.Title || ('Service No.' + serviceNumber);
+
     const fields = {
       ServiceNumber:    serviceNumber,
       Stop1Time:        times[0] || '*N/S',
@@ -39,13 +44,13 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
     if (existing) {
       await updateListItem('ShuttleServices', existing.ID, fields);
     } else {
-      await createListItem('ShuttleServices', { Title: `Service ${serviceNumber}`, ...fields });
+      await createListItem('ShuttleServices', { Title: serviceTitle, ...fields });
     }
 
     context.log.info(`mgmt-update-schedule: updated service ${serviceNumber} by ${payload.email}`);
 
-    // Fire-and-forget admin notification
-    notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, payload.email)
+    // Fire-and-forget notification with before/after diff
+    notifyAdmins(context, serviceTitle, serviceNumber, oldFields, times, dropoffOnlyStops, wasDisabled, disabled === true, payload.email)
       .catch(e => context.log.warn('notifyAdmins failed:', e.message));
 
     context.res = { status: 200, body: { updated: true, serviceNumber, times, dropoffOnlyStops } };
@@ -56,18 +61,14 @@ module.exports = wrapHandler('mgmt-update-schedule', async function (context, re
   }
 });
 
-async function notifyAdmins(context, serviceNumber, times, dropoffOnlyStops, changedBy) {
-  // Fetch all users and filter IsAdmin in code (IsAdmin not indexed in SharePoint)
+async function notifyAdmins(context, serviceTitle, serviceNumber, oldFields, newTimes, dropoffOnlyStops, wasDisabled, isNowDisabled, changedBy) {
   const allUsers = await getListItems('ShuttleUsers', '', 'id,Title,Name,IsAdmin', 500);
   const admins   = allUsers.filter(u => u.IsAdmin === true || u.IsAdmin === 1);
-  context.log.info(`notifyAdmins: ${admins.length} admin(s) found from ${allUsers.length} total users`);
-  if (!admins.length) {
-    context.log.warn('notifyAdmins: no admins found — check IsAdmin field in ShuttleUsers');
-    return;
-  }
+  context.log.info(`notifyAdmins: ${admins.length} admin(s) found`);
+  if (!admins.length) return;
 
-  const subject = `Hughes Shuttle — Service No.${serviceNumber} schedule updated`;
-  const html    = scheduleChangeTemplate(serviceNumber, times, dropoffOnlyStops || [], changedBy);
+  const subject = `Hughes Shuttle — ${serviceTitle} schedule updated`;
+  const html    = scheduleChangeTemplate(serviceTitle, serviceNumber, oldFields, newTimes, dropoffOnlyStops || [], wasDisabled, isNowDisabled, changedBy);
 
   await Promise.all(
     admins.map(a => {
