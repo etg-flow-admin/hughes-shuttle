@@ -1492,8 +1492,9 @@ async function saveSchedule() {
   if (!res || !res.ok) { showStatus('sched-status', 'Failed to save schedule.', 'error'); return; }
   const svc = SERVICES.find(s => s.id === _editSchedSvcId);
   if (svc) svc.times = newTimes;
-  showStatus('sched-status', 'Schedule updated for Service No.' + _editSchedSvcId + '.', 'success');
-  renderServicesPanel(); renderScheduleOverview(); loadDashServices();
+  showStatus('sched-status', 'Schedule updated.', 'success');
+  await loadServices();
+  loadDashServices();
   setTimeout(() => closeModal('modal-schedule'), 1200);
 }
 
