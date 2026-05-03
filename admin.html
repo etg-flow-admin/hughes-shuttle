@@ -570,6 +570,11 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
     <div id="sched-stops-grid"></div>
     <hr class="modal-divider">
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:8px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--navy);">
+        <input type="checkbox" id="sched-disabled" style="width:15px;height:15px;cursor:pointer;accent-color:#A32D2D;">
+        <span style="color:#A32D2D;font-weight:600;">Disable this service</span>
+      </label>
       <button class="btn btn-gold" onclick="saveSchedule()">Save schedule</button>
       <button class="btn btn-outline" onclick="closeModal('modal-schedule')">Cancel</button>
     </div>
@@ -782,6 +787,8 @@ async function loadDashboard() {
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   // No default date
   await Promise.all([ loadUsers(), loadServices() ]);
+  renderServicesPanel();
+  renderScheduleOverview();
   await loadBookings();
   updateBadges();
   loadDashServices();
@@ -903,7 +910,7 @@ function switchPanel(key) {
   event && event.currentTarget && event.currentTarget.classList.add('active');
   if (key === 'users')    renderUsers();
   if (key === 'bookings') { reloadBookings(); }
-  if (key === 'services') { loadStops(); loadServices().then(() => renderServicesPanel()); }
+  if (key === 'services') { loadStops(); loadServices().then(() => { renderServicesPanel(); renderScheduleOverview(); }); }
 }
 
 // ── Dashboard services ──
@@ -1323,6 +1330,7 @@ function renderScheduleOverview() {
   const thead = document.getElementById('schedule-overview-head');
   const tbody = document.getElementById('schedule-overview-body');
   if (!thead || !tbody) return;
+  if (!SERVICES || !SERVICES.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:1rem;">Loading…</td></tr>'; return; }
   const thS  = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:left;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
   const thSC = 'padding:8px 10px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.05em;background:var(--navy);text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.1);';
   thead.innerHTML = `<tr>
@@ -1404,7 +1412,7 @@ function openEditSchedule(svcId) {
   const svc = SERVICES.find(s => s.id === svcId);
   if (!svc) return;
   _editSchedSvcId = svcId;
-  document.getElementById('sched-modal-title').textContent = 'Edit schedule — Service No.' + svcId;
+  document.getElementById('sched-modal-title').textContent = 'Edit schedule — ' + (svc.title || ('Service No.' + svcId));
   const st = document.getElementById('sched-status');
   st.className = 'modal-status'; st.textContent = '';
   const dropoffOnly = svc.dropoffOnlyStops || [];
@@ -1431,6 +1439,8 @@ function openEditSchedule(svcId) {
       </label>
     </div>`;
   }).join('');
+  const _disEl = document.getElementById('sched-disabled');
+  if (_disEl) _disEl.checked = svc.disabled === true;
   openModal('modal-schedule');
 }
 
@@ -1464,7 +1474,7 @@ async function saveSchedule() {
     }
   });
   if (hasError) { showStatus('sched-status', 'Please enter a time for all active stops.', 'error'); return; }
-  if (!hasStop) { showStatus('sched-status', 'At least one stop must be active.', 'error'); return; }
+  // No minimum stop requirement — disabled services can have all stops N/S
 
   const btn = document.querySelector('#modal-schedule .btn-gold');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -1476,7 +1486,7 @@ async function saveSchedule() {
   });
   const res = await authFetch('/api/mgmt-update-schedule', {
     method: 'POST',
-    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes, dropoffOnlyStops })
+    body: JSON.stringify({ serviceNumber: _editSchedSvcId, times: newTimes, dropoffOnlyStops, disabled: document.getElementById('sched-disabled')?.checked === true })
   });
   btn.disabled = false; btn.textContent = 'Save schedule';
   if (!res || !res.ok) { showStatus('sched-status', 'Failed to save schedule.', 'error'); return; }
