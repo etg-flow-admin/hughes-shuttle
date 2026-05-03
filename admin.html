@@ -328,6 +328,7 @@ label.toggle input:not(:checked) + .toggle-slider { background: #A32D2D; }
             <th>Admin</th>
             <th onclick="sortUsers('bookings')">Bookings <span class="sort-arrow">↕</span></th>
             <th onclick="sortUsers('lastLoginAt')">Last login <span class="sort-arrow">↕</span></th>
+            <th onclick="sortUsers('createdAt')">Created <span class="sort-arrow">↕</span></th>
             <th></th>
           </tr></thead>
           <tbody id="user-tbody"></tbody>
@@ -803,6 +804,7 @@ async function loadUsers() {
     emailVerified:u.emailVerified,
     createdAt:    u.createdAt,
     lastLoginAt:  u.lastLoginAt,
+    createdAt:    u.createdAt,
     bookings:     0,  // will be computed from bookings
   }));
 }
@@ -1008,6 +1010,7 @@ function renderUsers() {
     <td>${u.isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
     <td>${u.bookings}</td>
     <td class="muted">${u.lastLoginAt ? formatLastLogin(u.lastLoginAt) : '—'}</td>
+    <td class="muted">${u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '—'}</td>
     <td><button class="btn btn-outline btn-sm" onclick="openEditUser('${esc(u.email)}')">Edit</button></td>
   </tr>`).join('');
 }
@@ -1618,8 +1621,8 @@ function exportHistoryCSV() {
 }
 
 function exportUsersCSV() {
-  const headers = ['Name','Email','Student ID','Room Number','Mobile','Status','Admin','Bookings','Email Verified'];
-  const rows = _users.map(u => [u.name, u.email, u.sid||'', u.roomNumber||'', u.mobile||'', u.status, u.isAdmin?'Yes':'No', u.bookings||0, u.emailVerified?'Yes':'No']);
+  const headers = ['Name','Email','Student ID','Room Number','Mobile','Status','Admin','Bookings','Last Login','Created At'];
+  const rows = _users.map(u => [u.name, u.email, u.sid||'', u.roomNumber||'', u.mobile||'', u.status, u.isAdmin?'Yes':'No', u.bookings||0, u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-AU') : '', u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-AU') : '']);
   exportCSV('users-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
 }
 
